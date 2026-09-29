@@ -1,0 +1,25 @@
+services:
+  build:
+    image: reallibretroretroarch/libretro-build-emscripten:latest
+    working_dir: /app
+    volumes:
+      - .:/app
+    command: ["sh", "-ec", "emmake make -f Makefile.emscripten HAVE_STATIC_DUMMY=1 LIBRETRO=dummy -j$$(nproc) && cp dummy_libretro.js dummy_libretro.wasm pkg/emscripten/libretro/ && mkdir -p pkg/emscripten/libretro/media && cp media/canvas.png media/retroarch.ico pkg/emscripten/libretro/media/"]
+    restart: "no"
+
+  web:
+    image: nginx:alpine
+    ports:
+      - "3000:80"
+    volumes:
+      - ./pkg/emscripten/libretro:/usr/share/nginx/html:ro
+    depends_on:
+      build:
+        condition: service_completed_successfully
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s

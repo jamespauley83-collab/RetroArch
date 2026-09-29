@@ -116,3 +116,14 @@ Keep changes focused.
 If a task requires a broad change, make the breadth necessary for the feature rather than artificially minimizing the number of files changed.
 
 A change touching many files is not inherently a problem in RetroArch. Missing a required layer of an established multi-file system is a problem.
+
+## Base44 Dev Environment
+
+RetroArch is a native C/C++ application, not a web app. The Base44 preview runs the Emscripten/WebAssembly build served by nginx.
+
+- `docker-compose.base44.yml` has two services: `build` (one-shot Emscripten compile) and `web` (nginx serving `pkg/emscripten/libretro/` on port 3000).
+- The build uses `reallibretroretroarch/libretro-build-emscripten:latest` (emcc 3.1.46) with `HAVE_STATIC_DUMMY=1 LIBRETRO=dummy` to produce a self-contained web player with no external core needed.
+- Output files are `dummy_libretro.js` and `dummy_libretro.wasm`, copied to `pkg/emscripten/libretro/`.
+- The web player uses the RGUI menu driver (built-in bitmap font) because the ozone/XMB drivers require external asset bundles not included in the source repo.
+- To rebuild after C source changes: `docker compose -f docker-compose.base44.yml up -d --build` (the build service re-runs automatically since it's `restart: "no"` and `web` depends on it).
+- No external secrets or credentials are needed.

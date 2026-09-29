@@ -4,7 +4,7 @@
  * This provides the basic JavaScript for the RetroArch web player.
  */
 
-const defaultCore = "gambatte";
+const defaultCore = "dummy";
 var autoStart = false;
 
 var BrowserFS = BrowserFS;
@@ -215,6 +215,11 @@ function startRetroArch() {
       Module.retroArchSend("FULLSCREEN_TOGGLE");
       Module.canvas.focus();
    });
+
+   // Use RGUI menu driver (built-in bitmap font) when asset bundle is not available
+   try {
+      Module.FS.writeFile("/home/web_user/retroarch/userdata/retroarch.cfg", 'menu_driver = "rgui"\n');
+   } catch (e) { /* filesystem not ready; RetroArch will use defaults */ }
 
    retroArchRunning = true;
    Module.callMain(Module.arguments);

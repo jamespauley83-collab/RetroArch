@@ -1,4 +1,5 @@
 const libretroCores = {
+	"dummy": "RetroArch (Built-in Dummy)",
 	"2048": "2048",
 	"DoubleCherryGB": "Nintendo - Game Boy / Color (DoubleCherryGB)",
 	"anarch": "Anarch",
