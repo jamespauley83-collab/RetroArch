@@ -124,6 +124,8 @@ RetroArch is a native C/C++ application, not a web app. The Base44 preview runs 
 - `docker-compose.base44.yml` has two services: `build` (one-shot Emscripten compile) and `web` (nginx serving `pkg/emscripten/libretro/` on port 3000).
 - The build uses `reallibretroretroarch/libretro-build-emscripten:latest` (emcc 3.1.46) with `HAVE_STATIC_DUMMY=1 LIBRETRO=dummy` to produce a self-contained web player with no external core needed.
 - Output files are `dummy_libretro.js` and `dummy_libretro.wasm`, copied to `pkg/emscripten/libretro/`.
-- The web player uses the RGUI menu driver (built-in bitmap font) because the ozone/XMB drivers require external asset bundles not included in the source repo.
+- nginx overlays `.base44/core_list.js` to select and expose only the packaged dummy core, ignoring saved core selections. The shared web player retains its normal defaults and core list.
+- Base44 seeds the RGUI menu driver (built-in bitmap font) only when `retroarch.cfg` is absent, since ozone/XMB require external asset bundles. Existing user configuration is preserved.
+- Run focused web-player checks with `node --experimental-vm-modules --test pkg/emscripten/tests/web-player.test.cjs`.
 - To rebuild after C source changes: `docker compose -f docker-compose.base44.yml up -d --build` (the build service re-runs automatically since it's `restart: "no"` and `web` depends on it).
 - No external secrets or credentials are needed.

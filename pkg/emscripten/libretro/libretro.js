@@ -4,7 +4,8 @@
  * This provides the basic JavaScript for the RetroArch web player.
  */
 
-const defaultCore = "dummy";
+const webPlayerConfig = typeof libretroConfig === "undefined" ? {} : libretroConfig;
+const defaultCore = webPlayerConfig.defaultCore || "gambatte";
 var autoStart = false;
 
 var BrowserFS = BrowserFS;
@@ -216,10 +217,14 @@ function startRetroArch() {
       Module.canvas.focus();
    });
 
-   // Use RGUI menu driver (built-in bitmap font) when asset bundle is not available
-   try {
-      Module.FS.writeFile("/home/web_user/retroarch/userdata/retroarch.cfg", 'menu_driver = "rgui"\n');
-   } catch (e) { /* filesystem not ready; RetroArch will use defaults */ }
+   if (webPlayerConfig.defaultConfig) {
+      var configPath = "/home/web_user/retroarch/userdata/retroarch.cfg";
+      try {
+         if (!Module.FS.analyzePath(configPath).exists) {
+            Module.FS.writeFile(configPath, webPlayerConfig.defaultConfig);
+         }
+      } catch (e) { /* RetroArch will use defaults */ }
+   }
 
    retroArchRunning = true;
    Module.callMain(Module.arguments);
@@ -348,7 +353,7 @@ $(function() {
    });
 
    // Find which core to load.
-   currentCore = localStorage.getItem("core") || defaultCore;
+   currentCore = webPlayerConfig.singleCore ? defaultCore : localStorage.getItem("core") || defaultCore;
    loadCore(currentCore).then(function() {
       console.log("WEBPLAYER: wasm runtime initialized");
       appInitialized();
