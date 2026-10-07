@@ -139,7 +139,7 @@ def build(root):
                             '-j' + str(min(os.cpu_count() or 2, 8))],
                            cwd=repo, stdout=log, stderr=subprocess.STDOUT, check=True)
         binary = repo / (core['name'] + '_libretro_ios.dylib')
-        run('xcrun', 'lipo', '-verify_arch', 'arm64', binary)
+        run('xcrun', 'lipo', binary, '-verify_arch', 'arm64')
         shutil.copy2(binary, modules)
         manifest['cores'].append(dict(core, patches=patch_hashes,
             sha256=hashlib.sha256(binary.read_bytes()).hexdigest()))
@@ -158,7 +158,7 @@ def build(root):
         ], cwd=apple, stdout=log, stderr=subprocess.STDOUT, check=True)
     app = work / 'DerivedData/Build/Products/Release-iphoneos/RetroArch.app'
     validate_app(app, lock)
-    run('xcrun', 'lipo', '-verify_arch', 'arm64', app / 'RetroArch')
+    run('xcrun', 'lipo', app / 'RetroArch', '-verify_arch', 'arm64')
     payload = work / 'Payload'
     payload.mkdir()
     shutil.copytree(app, payload / app.name, symlinks=True)

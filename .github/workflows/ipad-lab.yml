@@ -39,6 +39,7 @@ jobs:
         with:
           name: RetroArch-Lab-iPad-${{ github.sha }}
           path: .ipad-lab-build/*/artifacts/*
+          include-hidden-files: true
           if-no-files-found: error
           retention-days: 14
       - name: Upload build logs
@@ -47,5 +48,6 @@ jobs:
         with:
           name: RetroArch-Lab-logs-${{ github.run_id }}-${{ github.run_attempt }}
           path: .ipad-lab-build/*/*.log
+          include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 14
