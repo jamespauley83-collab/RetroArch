@@ -1,0 +1,51 @@
+name: RetroArch Lab iPad
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/ipad-retroarch-lab]
+    paths:
+      - 'pkg/apple/ipad-lab/**'
+      - '.github/workflows/ipad-lab.yml'
+  pull_request:
+    paths:
+      - 'pkg/apple/ipad-lab/**'
+      - '.github/workflows/ipad-lab.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ipad-lab-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    if: github.repository == 'jamespauley83-collab/RetroArch'
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Validate build inputs and packaging checks
+        run: |
+          python3 pkg/apple/ipad-lab/build.py --check
+          python3 -m unittest discover -s pkg/apple/ipad-lab/tests -v
+      - name: Build cores and iPad app
+        run: python3 -u pkg/apple/ipad-lab/build.py
+      - name: Upload unsigned IPA, sources, and manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: RetroArch-Lab-iPad-${{ github.sha }}
+          path: .ipad-lab-build/*/artifacts/*
+          if-no-files-found: error
+          retention-days: 14
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: RetroArch-Lab-logs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .ipad-lab-build/*/*.log
+          if-no-files-found: ignore
+          retention-days: 14
