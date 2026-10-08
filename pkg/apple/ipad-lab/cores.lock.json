@@ -1,0 +1,28 @@
+{
+  "bundle_id": "com.jamespauley.retroarchlab",
+  "display_name": "RetroArch Lab",
+  "minimum_ios": "15.0",
+  "cores": [
+    {
+      "name": "fceumm",
+      "system": "NES / Famicom",
+      "repository": "https://github.com/libretro/libretro-fceumm.git",
+      "commit": "7a542dab1e87679921962a9f056186eca425c0c2",
+      "makefile": "Makefile.libretro"
+    },
+    {
+      "name": "snes9x2010",
+      "system": "Super Nintendo",
+      "repository": "https://github.com/libretro/snes9x2010.git",
+      "commit": "fe690dd321fa5a46b5234a2bde089d2518c62b0e",
+      "makefile": "Makefile.libretro"
+    },
+    {
+      "name": "opera",
+      "system": "3DO",
+      "repository": "https://github.com/libretro/opera-libretro.git",
+      "commit": "ea60917d7f8f79a19b46e1d8ecc6eca7be589b6a",
+      "makefile": "Makefile"
+    }
+  ]
+}
