@@ -75,6 +75,11 @@ def overlay_core_info(root):
     replacement.replace(assets_path)
 
 
+def core_binary_path(core):
+    framework = core['name'].replace('_', '.') + '.libretro'
+    return Path('Frameworks') / (framework + '.framework') / framework
+
+
 def validate_app(app, lock):
     with (app / 'Info.plist').open('rb') as stream:
         info = plistlib.load(stream)
@@ -90,14 +95,34 @@ def validate_app(app, lock):
         if not ext['CFBundleIdentifier'].startswith(lock['bundle_id'] + '.'):
             raise ValueError('Extension identifier is not isolated from the official app.')
     for core in lock['cores']:
-        framework = core['name'].replace('_', '.') + '.libretro'
-        binary = app / 'Frameworks' / (framework + '.framework') / framework
+        binary = app / core_binary_path(core)
         if not binary.is_file():
             raise ValueError('Packaged core is missing: ' + core['name'])
     with zipfile.ZipFile(app / 'assets.zip') as assets:
         for core in lock['cores']:
             if 'info/' + core['name'] + '_libretro.info' not in assets.namelist():
                 raise ValueError('Packaged core info is missing: ' + core['name'])
+
+
+def package_app(app, work, artifacts, manifest):
+    payload = work / 'Payload'
+    payload.mkdir()
+    packaged_app = payload / app.name
+    shutil.copytree(app, packaged_app, symlinks=True)
+    for core in manifest['cores']:
+        binary = packaged_app / core_binary_path(core)
+        core['binary_path'] = binary.relative_to(work).as_posix()
+        core['sha256'] = hashlib.sha256(binary.read_bytes()).hexdigest()
+    (packaged_app / 'retroarch-lab-build.json').write_text(json.dumps(manifest, indent=2) + '\n')
+    ipa = artifacts / 'RetroArch-Lab-unsigned.ipa'
+    run('ditto', '-c', '-k', '--keepParent', payload, ipa)
+    with zipfile.ZipFile(ipa) as archive:
+        for core in manifest['cores']:
+            if hashlib.sha256(archive.read(core['binary_path'])).hexdigest() != core['sha256']:
+                raise ValueError('Packaged core checksum mismatch: ' + core['name'])
+    manifest['ipa_sha256'] = hashlib.sha256(ipa.read_bytes()).hexdigest()
+    (artifacts / 'build-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+    return ipa
 
 
 def build(root):
@@ -158,8 +183,7 @@ def build(root):
         binary = repo / (core['name'] + '_libretro_ios.dylib')
         run('xcrun', 'lipo', binary, '-verify_arch', 'arm64')
         shutil.copy2(binary, modules)
-        manifest['cores'].append(dict(core, patches=patch_hashes,
-            sha256=hashlib.sha256(binary.read_bytes()).hexdigest()))
+        manifest['cores'].append(dict(core, patches=patch_hashes))
     with (work / 'xcodebuild.log').open('w') as log:
         subprocess.run([
             'xcodebuild', '-project', str(apple / 'RetroArch_iOS13.xcodeproj'),
@@ -176,14 +200,7 @@ def build(root):
     app = work / 'DerivedData/Build/Products/Release-iphoneos/RetroArch.app'
     validate_app(app, lock)
     run('xcrun', 'lipo', app / 'RetroArch', '-verify_arch', 'arm64')
-    payload = work / 'Payload'
-    payload.mkdir()
-    shutil.copytree(app, payload / app.name, symlinks=True)
-    (payload / app.name / 'retroarch-lab-build.json').write_text(json.dumps(manifest, indent=2) + '\n')
-    ipa = artifacts / 'RetroArch-Lab-unsigned.ipa'
-    run('ditto', '-c', '-k', '--keepParent', payload, ipa)
-    manifest['ipa_sha256'] = hashlib.sha256(ipa.read_bytes()).hexdigest()
-    (artifacts / 'build-manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
+    ipa = package_app(app, work, artifacts, manifest)
     shutil.copy2(source / 'COPYING', artifacts / 'RetroArch-COPYING')
     shutil.copy2(source / LAB / 'README.md', artifacts / 'README.md')
     print('Build complete: ' + str(ipa), flush=True)

@@ -1,10 +1,13 @@
 import copy
+import hashlib
 import importlib.util
 import json
 from pathlib import Path
 import plistlib
+import shutil
 import tempfile
 import unittest
+from unittest import mock
 import zipfile
 
 spec = importlib.util.spec_from_file_location('ipad_build', Path(__file__).resolve().parents[1] / 'build.py')
@@ -39,6 +42,64 @@ class PackagingTests(unittest.TestCase):
 
     def test_complete_package(self):
         build.validate_app(self.app, self.lock)
+
+    def archive_payload(self, *args):
+        if shutil.which('ditto'):
+            return self.run_command(*args)
+        payload, ipa = args[-2:]
+        with zipfile.ZipFile(ipa, 'w') as archive:
+            for path in payload.rglob('*'):
+                if path.is_file():
+                    archive.write(path, path.relative_to(payload.parent))
+
+    def package(self, archive=None):
+        artifacts = self.root / 'artifacts'
+        artifacts.mkdir()
+        raw_hash = hashlib.sha256(b'original dylib').hexdigest()
+        manifest = {'cores': [dict(core, patches={'diagnostics.patch': 'patch-hash'},
+                                   sha256=raw_hash) for core in self.lock['cores']]}
+        self.run_command = build.run
+        with mock.patch.object(build, 'run', side_effect=archive or self.archive_payload):
+            ipa = build.package_app(self.app, self.root, artifacts, manifest)
+        return ipa, json.loads((artifacts / 'build-manifest.json').read_text())
+
+    def test_manifest_hashes_match_final_ipa_executables(self):
+        expected = {}
+        for core in self.lock['cores']:
+            name = core['name'].replace('_', '.') + '.libretro'
+            relative = 'Frameworks/' + name + '.framework/' + name
+            data = ('framework after conversion and signing: ' + core['name']).encode()
+            (self.app / relative).write_bytes(data)
+            expected[core['name']] = ('Payload/RetroArch.app/' + relative, data)
+        ipa, manifest = self.package()
+        with zipfile.ZipFile(ipa) as archive:
+            embedded = json.loads(archive.read('Payload/RetroArch.app/retroarch-lab-build.json'))
+            self.assertEqual(embedded['cores'], manifest['cores'])
+            self.assertNotIn('ipa_sha256', embedded)
+            for core in manifest['cores']:
+                path, data = expected[core['name']]
+                self.assertEqual(core['binary_path'], path)
+                self.assertEqual(archive.read(path), data)
+                self.assertEqual(core['sha256'], hashlib.sha256(archive.read(path)).hexdigest())
+                self.assertNotEqual(core['sha256'], hashlib.sha256(b'original dylib').hexdigest())
+                self.assertEqual(core['patches'], {'diagnostics.patch': 'patch-hash'})
+        self.assertEqual(manifest['ipa_sha256'], hashlib.sha256(ipa.read_bytes()).hexdigest())
+
+    def test_archive_checksum_mismatch_stops_packaging(self):
+        def changed_archive(*args):
+            payload = args[-2]
+            next((payload / self.app.name / 'Frameworks').glob('*/*')).write_bytes(b'changed')
+            self.archive_payload(*args)
+
+        with self.assertRaisesRegex(ValueError, 'core checksum mismatch'):
+            self.package(changed_archive)
+        self.assertFalse((self.root / 'artifacts/build-manifest.json').exists())
+
+    def test_missing_final_core_stops_manifest_creation(self):
+        next((self.app / 'Frameworks').glob('*/*')).unlink()
+        with self.assertRaises(FileNotFoundError):
+            self.package()
+        self.assertFalse((self.root / 'artifacts/build-manifest.json').exists())
 
     def test_core_info_overlay_preserves_other_assets(self):
         assets_path = self.root / 'pkg/apple/assets.zip'

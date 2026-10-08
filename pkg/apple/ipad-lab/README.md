@@ -32,6 +32,13 @@ licenses, and a build manifest recording source commits, patches, Xcode/SDK
 versions, and checksums. The frontend source is the manifest's `retroarch_commit`
 in https://github.com/jamespauley83-collab/RetroArch.
 
+Each core's `sha256` hashes the final framework executable at its `binary_path`
+inside the unsigned IPA, after framework conversion and build-time signing.
+The build checks those hashes against the completed IPA. The embedded
+`retroarch-lab-build.json` records the same core paths and hashes; the external
+`build-manifest.json` also includes `ipa_sha256` for the whole archive.
+Verify these before device signing, which can change the executable bytes.
+
 ## Install and test
 
 The IPA is **not device-signed and cannot be installed directly**. Its embedded
