@@ -1,0 +1,188 @@
+diff --git a/libretro.c b/libretro.c
+index 27e7f9d..9e2eb15 100644
+--- a/libretro.c
++++ b/libretro.c
+@@ -1,3 +1,4 @@
++#include "opera_lab.h"
+ #include "file/file_path.h"
+ #include "libretro.h"
+ #include "libretro_core_options.h"
+@@ -47,6 +48,7 @@ typedef enum retro_reset_flags_t
+ static cdimage_t  CDIMAGE;
+ static uint32_t   CDIMAGE_SECTOR;
+ static char      *g_GAME_INFO_PATH = NULL;
++static unsigned  g_LAB_FRAMES = 0;
+ 
+ static
+ void
+@@ -466,16 +468,32 @@ retro_load_game(const struct retro_game_info *info_)
+ {
+   int rv;
+ 
++  g_LAB_FRAMES = 0;
++  opera_lab_log("START content: %s",info_ && info_->path ? info_->path : "no disc");
+   content_runtime_reset();
+   game_info_path_save(info_);
+ 
+   rv = open_cdimage_if_needed(info_);
+   if(rv == -1)
+-    return false;
++    {
++      opera_lab_log("Disc open failed");
++      return false;
++    }
++  opera_lab_log("Disc opened");
+ 
+   ode_root_set_for_content(info_);
+   opera_lr_opts_process();
++  if(!g_OPTS.bios)
++    {
++      struct retro_message message;
++      message.msg = "Opera Lab: no BIOS loaded. See opera-lab-diagnostic.log in saves.";
++      message.frames = 600;
++      retro_environment_cb(RETRO_ENVIRONMENT_SET_MESSAGE,&message);
++      opera_lab_log("No BIOS loaded; emulation will not boot normally");
++    }
++  opera_lab_log("Initializing 3DO");
+   opera_3do_init(libopera_callback);
++  opera_lab_log("3DO initialized");
+   cdimage_set_sector(0);
+ 
+   rv = set_pixel_format();
+@@ -486,6 +504,7 @@ retro_load_game(const struct retro_game_info *info_)
+                       g_OPTS.nvram_shared,
+                       g_OPTS.nvram_version);
+ 
++  opera_lab_log("Content startup completed");
+   return true;
+ }
+ 
+@@ -755,7 +774,16 @@ retro_run(void)
+ 
+   lr_input_update(g_OPTS.active_devices);
+ 
++  if(g_LAB_FRAMES == 0)
++    opera_lab_log("Entering first emulation frame");
+   opera_3do_process_frame();
++  if(g_LAB_FRAMES < 300)
++    {
++      g_LAB_FRAMES++;
++      if(g_LAB_FRAMES == 1 || g_LAB_FRAMES == 60 || g_LAB_FRAMES == 300)
++        opera_lab_log("Frame %u completed: %ux%u",g_LAB_FRAMES,
++                       g_OPTS.video_width,g_OPTS.video_height);
++    }
+   if(ode_reset_if_requested())
+     return;
+ 
+diff --git a/libretro_core_options.c b/libretro_core_options.c
+index c13ef2d..3671192 100644
+--- a/libretro_core_options.c
++++ b/libretro_core_options.c
+@@ -1,6 +1,7 @@
+ #include "libopera/opera_bios.h"
+ 
+ #include "opera_lr_callbacks.h"
++#include "opera_lab.h"
+ 
+ #include <file/file_path.h>
+ #include <libretro.h>
+@@ -736,12 +737,17 @@ file_exists_in_system_directory(const char *filename)
+   ret = retro_environment_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &system_path);
+ 
+   if((ret == 0) || !system_path)
+-    return false;
++    {
++      opera_lab_log("BIOS discovery: system directory unavailable");
++      return false;
++    }
+ 
+   fullpath[0] = '\0';
+   fill_pathname_join(fullpath, system_path, filename, sizeof(fullpath));
+ 
+-  return path_is_valid(fullpath);
++  ret = path_is_valid(fullpath);
++  opera_lab_log("BIOS discovery: %s [%s]",fullpath,ret ? "present" : "missing");
++  return ret;
+ }
+ 
+ static
+diff --git a/opera_lab.h b/opera_lab.h
+new file mode 100644
+index 0000000..992f319
+--- /dev/null
++++ b/opera_lab.h
+@@ -0,0 +1,36 @@
++#ifndef OPERA_LAB_H_INCLUDED
++#define OPERA_LAB_H_INCLUDED
++
++#include "opera_lr_callbacks.h"
++#include <file/file_path.h>
++#include <retro_miscellaneous.h>
++#include <stdarg.h>
++#include <stdio.h>
++
++static void
++opera_lab_log(const char *format, ...)
++{
++  const char *directory = NULL;
++  char path[PATH_MAX_LENGTH];
++  char message[2048];
++  FILE *file;
++  va_list args;
++
++  va_start(args,format);
++  vsnprintf(message,sizeof(message),format,args);
++  va_end(args);
++  if(retro_log_printf_cb)
++    retro_log_printf_cb(RETRO_LOG_INFO,"[Opera Lab] %s\n",message);
++  if(!retro_environment_cb ||
++     !retro_environment_cb(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY,&directory) ||
++     !directory || !directory[0])
++    return;
++  fill_pathname_join(path,directory,"opera-lab-diagnostic.log",sizeof(path));
++  file = fopen(path,"a");
++  if(!file)
++    return;
++  fprintf(file,"[Opera Lab] %s\n",message);
++  fclose(file);
++}
++
++#endif
+diff --git a/opera_lr_opts.c b/opera_lr_opts.c
+index 1236fcf..2ef0852 100644
+--- a/opera_lr_opts.c
++++ b/opera_lr_opts.c
+@@ -1,3 +1,4 @@
++#include "opera_lab.h"
+ /*
+   ISC License
+ 
+@@ -243,14 +244,19 @@ read_file_from_system_directory(const char *filename_,
+     return -1;
+ 
+   fill_pathname_join(fullpath,system_path,filename_,PATH_MAX_LENGTH);
++  opera_lab_log("ROM read: %s",fullpath);
+ 
+   file = filestream_open(fullpath,RETRO_VFS_FILE_ACCESS_READ,RETRO_VFS_FILE_ACCESS_HINT_NONE);
+   if(file == NULL)
+-    return -1;
++    {
++      opera_lab_log("ROM open failed: %s",fullpath);
++      return -1;
++    }
+ 
+   rv = filestream_read(file,data_,size_);
+ 
+   filestream_close(file);
++  opera_lab_log("ROM bytes read: %ld of %ld",(long)rv,(long)size_);
+ 
+   return rv;
+ }
+@@ -265,6 +271,7 @@ opera_lr_opts_get_bios(opera_lr_opts_t *opts_)
+   opts_->bios = NULL;
+ 
+   val = getval("bios");
++  opera_lab_log("BIOS option: %s",val ? val : "unset");
+   if(val == NULL)
+     return;
+ 

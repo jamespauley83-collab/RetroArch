@@ -59,6 +59,22 @@ def customize_plist(path, lock):
         plistlib.dump(info, stream)
 
 
+def overlay_core_info(root):
+    assets_path = root / 'pkg/apple/assets.zip'
+    additions = {('info/' + path.name): path.read_bytes()
+                 for path in (root / LAB / 'info').glob('*_libretro.info')}
+    if not additions:
+        return
+    replacement = assets_path.with_suffix('.lab.zip')
+    with zipfile.ZipFile(assets_path) as original, zipfile.ZipFile(replacement, 'w') as updated:
+        for entry in original.infolist():
+            if entry.filename not in additions:
+                updated.writestr(entry, original.read(entry.filename))
+        for name, data in additions.items():
+            updated.writestr(name, data, compress_type=zipfile.ZIP_DEFLATED)
+    replacement.replace(assets_path)
+
+
 def validate_app(app, lock):
     with (app / 'Info.plist').open('rb') as stream:
         info = plistlib.load(stream)
@@ -101,6 +117,7 @@ def build(root):
     (work / 'source.tar').unlink()
     lock = load_lock(source / LAB / 'cores.lock.json')
     apple = source / 'pkg/apple'
+    overlay_core_info(source)
     customize_plist(apple / 'iOS/Info.plist', lock)
     # The exported tree has no .git directory for the upstream build phase.
     (source / '.git_version.h').write_text('#define GIT_VERSION ' + revision[:8] + '\n')
@@ -181,7 +198,8 @@ def main():
     if args.check:
         with zipfile.ZipFile(ROOT / 'pkg/apple/assets.zip') as assets:
             for core in lock['cores']:
-                if 'info/' + core['name'] + '_libretro.info' not in assets.namelist():
+                if ('info/' + core['name'] + '_libretro.info' not in assets.namelist()
+                        and not (ROOT / LAB / 'info' / (core['name'] + '_libretro.info')).is_file()):
                     raise ValueError('Core info missing from bundled assets: ' + core['name'])
         print('Inputs valid: ' + ', '.join(c['name'] for c in lock['cores']))
     else:

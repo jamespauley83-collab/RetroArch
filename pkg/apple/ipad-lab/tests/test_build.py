@@ -40,6 +40,21 @@ class PackagingTests(unittest.TestCase):
     def test_complete_package(self):
         build.validate_app(self.app, self.lock)
 
+    def test_core_info_overlay_preserves_other_assets(self):
+        assets_path = self.root / 'pkg/apple/assets.zip'
+        assets_path.parent.mkdir(parents=True)
+        info = self.root / build.LAB / 'info'
+        info.mkdir(parents=True)
+        (info / 'opera_libretro.info').write_text('corename = "Opera"')
+        with zipfile.ZipFile(assets_path, 'w') as assets:
+            assets.writestr('menu/icon.png', b'original icon')
+            assets.writestr('info/opera_libretro.info', 'old info')
+        build.overlay_core_info(self.root)
+        with zipfile.ZipFile(assets_path) as assets:
+            self.assertEqual(assets.read('menu/icon.png'), b'original icon')
+            self.assertEqual(assets.read('info/opera_libretro.info'), b'corename = "Opera"')
+            self.assertEqual(assets.namelist().count('info/opera_libretro.info'), 1)
+
     def test_rejects_official_app_identity(self):
         self.info['CFBundleIdentifier'] = 'com.libretro.RetroArchiOS11'
         self.write_info()
