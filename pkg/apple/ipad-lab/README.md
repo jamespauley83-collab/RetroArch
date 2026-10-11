@@ -1,7 +1,7 @@
 # RetroArch Lab for iPad
 
 A separate native iOS build for testing emulator-core changes. The first baseline
-includes FCEUmm (NES/Famicom), Snes9x 2010 (SNES), and Opera (3DO),
+includes FCEUmm (NES/Famicom), Snes9x 2010 (SNES), Opera (3DO), and Dolphin (GameCube/Wii),
 all compiled from source. Opera includes a local startup diagnostic patch.
 This is an initial development build, not a confirmed fix for any game.
 
@@ -59,8 +59,8 @@ as well. Test one game at a time, including touch/controller input, audio, graph
 in-game saving, restarting, and loading that save.
 
 Device signing, installation, and real iPad gameplay must still be verified.
-This build does not automatically enable JIT. The initial two cores do not depend
-on JIT; adding demanding systems needs a separate compatibility assessment.
+This build does not automatically enable JIT. Dolphin needs a separate JIT setup
+for practical performance; see the Dolphin instructions below.
 
 ## Change a core
 
@@ -70,8 +70,10 @@ fix, update that SHA to a reviewed commit, or add ordered `.patch` files under
 a patch that no longer applies stops the build. Commit and rebuild the complete
 app, then sign/install it as an update to Lab.
 
-The initial recipe supports cores with a root Makefile and an `ios-arm64` target
-producing `<name>_libretro_ios.dylib`. Other cores may require different recipes,
+The Makefile recipe supports cores with a root Makefile and an `ios-arm64` target
+producing `<name>_libretro_ios.dylib`. Dolphin uses its upstream iOS CMake recipe
+and pinned recursive submodules, excluding the Windows Qt and FFmpeg SDKs.
+Other cores may require different recipes,
 submodules, dependencies, BIOS files, graphics support, or JIT. Add these explicitly
 rather than assuming every core uses the same build command.
 
@@ -97,3 +99,31 @@ Opera is pinned to upstream `ea60917d7f8f79a19b46e1d8ecc6eca7be589b6a`.
 Its core information is copied from libretro-core-info blob
 `d8447c579efd7425edc06b6e03697abfeebee062` and overlaid only in the exported
 build tree. The committed shared assets bundle is unchanged.
+
+## Dolphin (GameCube / Wii)
+
+Install the new IPA as an update to **RetroArch Lab**, using the same signing
+account and bundle identity as before. Keep a copy of Lab's saves first.
+The build preserves the existing three cores and adds `dolphin.libretro.framework`.
+Dolphin is built from the revision in `cores.lock.json`; its submodule revisions
+and final packaged executable checksum are recorded in the build manifest.
+Core metadata is from libretro-core-info revision
+`5a74858ab2f7a50cebb5a6330895bc38899531c0`.
+
+1. Extract the accompanying `Dolphin-system-files.zip`. Copy its `dolphin-emu`
+   folder into Lab's **Settings > Directory > System/BIOS** location. Confirm
+   `dolphin-emu/Sys/codehandler.bin` exists there. These are Dolphin's support
+   files from the same source revision; games and Nintendo BIOS dumps are not included.
+2. In Lab, run **Online Updater > Update Core Info Files** if upgrading an existing
+   installation, then restart. Choose **Load Core > Nintendo - GameCube / Wii (Dolphin)**.
+3. Use **Settings > Drivers > Video > vulkan**, save the configuration and restart
+   Lab before loading a game. The frontend already bundles MoltenVK; Dolphin's
+   libretro hardware renderer does not use RetroArch's `metal` driver directly.
+4. Enable JIT for **RetroArch Lab** through your compatible signing/debugging setup
+   before loading a game. Installing this IPA does not enable JIT. Without JIT,
+   Dolphin may fall back to its slower interpreter.
+5. Load one GameCube game copied into Lab's own storage. Start at native resolution
+   and verify graphics, audio, controller input, an in-game save, and loading that save.
+
+Compilation and package validation do not establish device compatibility or game
+performance. Those checks require the signed build running on the iPad.

@@ -41,9 +41,57 @@ def load_lock(path):
             raise ValueError('Pin each core to a complete commit SHA.')
         if not re.fullmatch(r'https://github.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\.git', core['repository']):
             raise ValueError('Core repositories must be HTTPS GitHub URLs.')
-        if not re.fullmatch(r'Makefile[\w.-]*', core['makefile']):
-            raise ValueError('Expected a core Makefile in its repository root.')
+        recipe = core.get('recipe', 'make')
+        if recipe == 'make':
+            if not re.fullmatch(r'Makefile[\w.-]*', core['makefile']):
+                raise ValueError('Expected a core Makefile in its repository root.')
+        elif recipe != 'dolphin-cmake' or name != 'dolphin':
+            raise ValueError('Unsupported core build recipe.')
     return lock
+
+
+def prepare_dolphin(repo):
+    # Skip the large Windows-only SDKs; retain pinned dependency sources.
+    paths = output('git', 'config', '--file', '.gitmodules',
+                   '--get-regexp', 'submodule.*.path', cwd=repo)
+    submodules = [line.split()[1] for line in paths.splitlines()
+                  if line.split()[1] not in ('Externals/Qt', 'Externals/FFmpeg-bin')]
+    run('git', 'submodule', 'update', '--init', '--recursive', '--depth=1',
+        '--', *submodules, cwd=repo)
+    return output('git', 'submodule', 'status', '--recursive', cwd=repo)
+
+
+def compile_core(core, repo, work, minimum_ios):
+    jobs = str(min(os.cpu_count() or 2, 8))
+    with (work / (core['name'] + '-build.log')).open('w') as log:
+        def logged(args):
+            subprocess.run([str(arg) for arg in args], cwd=repo,
+                           stdout=log, stderr=subprocess.STDOUT, check=True)
+
+        if core.get('recipe') == 'dolphin-cmake':
+            directory = repo / 'build/ios-arm64'
+            logged(['cmake', '-S', repo, '-B', directory,
+                    '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_POSITION_INDEPENDENT_CODE=ON',
+                    '-DIOS=ON', '-DCMAKE_SYSTEM_NAME=iOS', '-DCMAKE_SYSTEM_PROCESSOR=arm64',
+                    '-DCMAKE_OSX_ARCHITECTURES=arm64',
+                    '-DCMAKE_OSX_DEPLOYMENT_TARGET=' + minimum_ios, '-DLIBRETRO=ON'])
+            logged(['cmake', '--build', directory, '--target', 'dolphin_libretro', '-j', jobs])
+            return directory / 'dolphin_libretro.dylib'
+        logged(['make', '-f', core['makefile'], 'platform=ios-arm64', '-j' + jobs])
+        return repo / (core['name'] + '_libretro_ios.dylib')
+
+
+def package_dolphin_system(repo, artifacts):
+    sys_dir = repo / 'Data/Sys'
+    if not (sys_dir / 'codehandler.bin').is_file():
+        raise ValueError('Dolphin system files are missing.')
+    archive_path = artifacts / 'Dolphin-system-files.zip'
+    with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as archive:
+        for path in sorted(sys_dir.rglob('*')):
+            if path.is_file():
+                archive.write(path, 'dolphin-emu/Sys/' + path.relative_to(sys_dir).as_posix())
+    return {'file': archive_path.name,
+            'sha256': hashlib.sha256(archive_path.read_bytes()).hexdigest()}
 
 
 def customize_plist(path, lock):
@@ -168,6 +216,9 @@ def build(root):
         run('git', 'checkout', '--detach', 'FETCH_HEAD', cwd=repo)
         if output('git', 'rev-parse', 'HEAD', cwd=repo) != core['commit']:
             raise RuntimeError('Core checkout does not match the lock file.')
+        record = dict(core)
+        if core.get('recipe') == 'dolphin-cmake':
+            record['submodules'] = prepare_dolphin(repo)
         patches = sorted((source / LAB / 'patches' / core['name']).glob('*.patch'))
         patch_hashes = {}
         for patch in patches:
@@ -176,14 +227,12 @@ def build(root):
             patch_hashes[patch.name] = hashlib.sha256(patch.read_bytes()).hexdigest()
         # Include the exact modified core sources with the binary artifact.
         run('tar', '--exclude=.git', '-czf', artifacts / (core['name'] + '-source.tar.gz'), '-C', repo, '.')
-        with (work / (core['name'] + '-build.log')).open('w') as log:
-            subprocess.run(['make', '-f', core['makefile'], 'platform=ios-arm64',
-                            '-j' + str(min(os.cpu_count() or 2, 8))],
-                           cwd=repo, stdout=log, stderr=subprocess.STDOUT, check=True)
-        binary = repo / (core['name'] + '_libretro_ios.dylib')
+        binary = compile_core(core, repo, work, lock['minimum_ios'])
         run('xcrun', 'lipo', binary, '-verify_arch', 'arm64')
         shutil.copy2(binary, modules)
-        manifest['cores'].append(dict(core, patches=patch_hashes))
+        if core.get('recipe') == 'dolphin-cmake':
+            record['system_files'] = package_dolphin_system(repo, artifacts)
+        manifest['cores'].append(dict(record, patches=patch_hashes))
     with (work / 'xcodebuild.log').open('w') as log:
         subprocess.run([
             'xcodebuild', '-project', str(apple / 'RetroArch_iOS13.xcodeproj'),
