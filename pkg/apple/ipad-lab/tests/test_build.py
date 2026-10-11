@@ -180,6 +180,14 @@ class PackagingTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Unsupported core build recipe'):
             build.load_lock(path)
 
+    def test_icloud_entitlements_are_isolated_and_follow_lab_identity(self):
+        lock = dict(self.lock, bundle_id='com.jamespauley.retroarchlab.test')
+        entitlements = build.icloud_entitlements(lock)
+        container = 'iCloud.com.jamespauley.retroarchlab.test'
+        self.assertEqual(entitlements['com.apple.developer.icloud-container-identifiers'], [container])
+        self.assertEqual(entitlements['com.apple.developer.ubiquity-container-identifiers'], [container])
+        self.assertEqual(entitlements['com.apple.developer.icloud-services'], ['CloudDocuments'])
+
 
 if __name__ == '__main__':
     unittest.main()

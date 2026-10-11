@@ -27,6 +27,9 @@ OBJS := $(SOURCES_M:.m=.o) $(SOURCES_C:.c=.o)
 
 CFLAGS  += -Wall -g $(INCDIRS) -DHAVE_CLOUDSYNC
 OBJCFLAGS := $(CFLAGS) -fobjc-arc
+ifneq ($(ICLOUD_DRIVE_CONTAINER),)
+   OBJCFLAGS += '-DICLOUD_DRIVE_CONTAINER_NAME=@"$(ICLOUD_DRIVE_CONTAINER)"'
+endif
 LDFLAGS += -framework Foundation
 
 ifneq ($(SANITIZER),)

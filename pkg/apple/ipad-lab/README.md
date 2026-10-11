@@ -100,6 +100,40 @@ Its core information is copied from libretro-core-info blob
 `d8447c579efd7425edc06b6e03697abfeebee062` and overlaid only in the exported
 build tree. The committed shared assets bundle is unchanged.
 
+## iCloud Drive sync
+
+Lab includes the `icloud_drive` backend at **Settings > Saving > Cloud Sync >
+Cloud Sync Backend**. It uses `iCloud.com.jamespauley.retroarchlab`, separate
+from the official RetroArch app's container. Lab installations on your iPhone
+and iPad can share this container when signed by the same developer team and
+used with the same iCloud account. It cannot access the official app's cloud saves.
+
+The unsigned artifact includes `RetroArch-Lab-iCloud.entitlements`. Enabling the
+menu option alone is not sufficient: the signed app and its provisioning profile
+must both authorize that exact container and the `CloudDocuments` service.
+
+1. In Apple Developer Certificates, Identifiers & Profiles, register the iCloud
+   container `iCloud.com.jamespauley.retroarchlab` under your developer team.
+2. Enable iCloud Documents on the **existing installed Lab app's explicit App ID**,
+   associate that container, and regenerate its development provisioning profile.
+   Preserve the existing signing team and installed bundle identity when updating.
+3. Re-sign the IPA with that profile and the supplied iCloud entitlements, preserving
+   the normal signing entitlements supplied by your signer. Use a signing tool that
+   retains custom entitlements. Sideloadly documents this as a Patreon feature for
+   Apple Developer Program members; ordinary sideloading may strip them.
+4. Install as an update to Lab, keeping a backup of its saves. On each device,
+   enable iCloud Drive in iOS Settings, then enable Cloud Sync in Lab, choose
+   `icloud_drive`, enable Sync Saves, and leave Destructive Cloud Sync off.
+5. Save the configuration and restart Lab. Verify successful sync with one test
+   save on the first device before testing a download on the second device.
+
+The build records the container in `build-manifest.json`. CI verifies compilation,
+packaging and driver behavior with a simulated container; a real two-device sync
+requires device signing and cannot be established by the unsigned build.
+
+References: [Apple iCloud setup](https://developer.apple.com/documentation/xcode/configuring-icloud-services),
+[Sideloadly changelog](https://sideloadly.io/changelog.html).
+
 ## Dolphin (GameCube / Wii)
 
 Install the new IPA as an update to **RetroArch Lab**, using the same signing

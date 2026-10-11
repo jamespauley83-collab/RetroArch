@@ -73,13 +73,15 @@ void RARCH_DBG(const char *fmt, ...)
 }
 
 static NSURL *test_container = nil;
+static BOOL wrong_container = NO;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wobjc-protocol-method-implementation"
 @implementation NSFileManager (ICloudDriveTest)
 - (NSURL *)URLForUbiquityContainerIdentifier:(NSString *)identifier
 {
-   (void)identifier;
+   if (![identifier isEqualToString:ICLOUD_DRIVE_CONTAINER_NAME])
+      wrong_container = YES;
    return test_container;
 }
 @end
@@ -339,6 +341,7 @@ int main(void)
       test_update_unreadable_local();
       test_delete();
       test_no_container();
+      CHECK(!wrong_container, "driver requested the wrong iCloud container");
 
       system(cmd);
    }

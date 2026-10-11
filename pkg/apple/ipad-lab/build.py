@@ -107,6 +107,15 @@ def customize_plist(path, lock):
         plistlib.dump(info, stream)
 
 
+def icloud_entitlements(lock):
+    container = 'iCloud.' + lock['bundle_id']
+    return {
+        'com.apple.developer.icloud-container-identifiers': [container],
+        'com.apple.developer.ubiquity-container-identifiers': [container],
+        'com.apple.developer.icloud-services': ['CloudDocuments'],
+    }
+
+
 def overlay_core_info(root):
     assets_path = root / 'pkg/apple/assets.zip'
     additions = {('info/' + path.name): path.read_bytes()
@@ -208,6 +217,13 @@ def build(root):
     }
     artifacts = work / 'artifacts'
     artifacts.mkdir()
+    entitlements = artifacts / 'RetroArch-Lab-iCloud.entitlements'
+    entitlements.write_bytes(plistlib.dumps(icloud_entitlements(lock)))
+    manifest['icloud_drive'] = {
+        'container': 'iCloud.' + lock['bundle_id'],
+        'entitlements_file': entitlements.name,
+        'requires_device_provisioning': True,
+    }
     for core in lock['cores']:
         repo = work / core['name']
         run('git', 'init', repo)
@@ -238,8 +254,10 @@ def build(root):
             'xcodebuild', '-project', str(apple / 'RetroArch_iOS13.xcodeproj'),
             '-scheme', 'RetroArch iOS Release', '-configuration', 'Release',
             '-destination', 'generic/platform=iOS', '-derivedDataPath', str(work / 'DerivedData'),
-            '-xcconfig', str(apple / 'GitHubCI.xcconfig'),
+            '-xcconfig', str(source / LAB / 'Lab.xcconfig'),
             'IOS_BUNDLE_IDENTIFIER=' + lock['bundle_id'],
+            'LAB_ICLOUD_CONTAINER=' + manifest['icloud_drive']['container'],
+            'IOS_CODE_SIGN_ENTITLEMENTS=' + str(entitlements),
             'RA_IPHONEOS_DEPLOYMENT_TARGET=' + lock['minimum_ios'],
             'ARCHS=arm64', 'ONLY_ACTIVE_ARCH=NO', 'DEVELOPMENT_TEAM=',
             'CODE_SIGNING_ALLOWED=NO', 'CODE_SIGNING_REQUIRED=NO',
