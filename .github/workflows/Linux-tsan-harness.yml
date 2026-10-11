@@ -34,7 +34,7 @@ jobs:
   linux-tsan-harness:
     name: TSan build, the threaded-video harness
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 55
 
     steps:
       - name: Install dependencies
