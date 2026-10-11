@@ -263,6 +263,15 @@ def build(root):
             run('git', 'apply', '--check', patch, cwd=repo)
             run('git', 'apply', patch, cwd=repo)
             patch_hashes[patch.name] = hashlib.sha256(patch.read_bytes()).hexdigest()
+        if core.get('recipe') == 'play-cmake':
+            test = work / 'play-jit-memory-test'
+            run('c++', '-std=c++17', '-pthread',
+                '-I' + str(repo / 'Source/ui_libretro'),
+                '-I' + str(repo / 'deps/CodeGen/include'),
+                '-I' + str(repo / 'deps/Framework/include'),
+                repo / 'deps/CodeGen/src/MemoryFunction.cpp',
+                source / LAB / 'tests/play_jit_memory.cpp', '-o', test)
+            run(test)
         # Include the exact modified core sources with the binary artifact.
         run('tar', '--exclude=.git', '-czf', artifacts / (core['name'] + '-source.tar.gz'), '-C', repo, '.')
         binary = compile_core(core, repo, work, lock['minimum_ios'])

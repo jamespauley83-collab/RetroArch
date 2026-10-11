@@ -179,8 +179,11 @@ in the build artifact and manifest. Core metadata is from libretro-core-info blo
 3. Select **Settings > Drivers > Video > gl**, save the configuration, and restart
    Lab. This core uses OpenGL ES on iOS. Dolphin uses `vulkan`, so change the driver
    and restart when switching between these two cores.
-4. Enable JIT for **RetroArch Lab** before loading a PS2 game. Play!'s iOS core
-   checks the frontend's JIT capability and refuses to load when it is unavailable.
+4. Enable JIT for **RetroArch Lab** before loading a PS2 game. The Lab patch uses
+   RetroArch's executable-memory API on iOS 26 and newer, including separate
+   executable and writable mappings. Earlier iOS versions retain the legacy JIT
+   path. VM initialization is deferred until this check succeeds; if JIT is not
+   ready, enable it and retry the game.
 5. Load an extracted PS2 `.iso` or `.chd` from Lab's storage. Play! does not require
    a PS2 BIOS. Start at the native **1x** resolution and test graphics, audio,
    controller input, an in-game save, and loading that save after restarting.
@@ -190,6 +193,13 @@ packaging checks do not establish real iPad gameplay. Its memory cards and
 configuration use the upstream `Play Data Files` directory in the app's Documents
 folder. Back up that folder as well as RetroArch's saves; do not assume the cloud
 Sync Saves option includes it.
+
+The Lab-only Play! patch also routes block linking and cloning through the writable
+mapping and recycles freed code within a frontend-owned arena. The build runs a
+host regression harness against the patched CodeGen sources before compiling iOS.
+This covers separate read/write mappings, block edits, clone/move ownership,
+exhaustion, free-space reuse, concurrency, unavailable JIT, retry, and cleanup.
+Linux x86-64 additionally executes generated and patched code in the harness.
 
 References: [Play! source and iOS instructions](https://github.com/jpd002/Play-),
 [Libretro Play! documentation](https://docs.libretro.com/library/play/).
