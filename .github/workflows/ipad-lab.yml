@@ -6,6 +6,8 @@ on:
     branches: [codex/ipad-retroarch-lab]
     paths:
       - 'pkg/apple/ipad-lab/**'
+      - 'network/cloud_sync/icloud_drive.m'
+      - 'samples/network/icloud_drive/**'
       - '.github/workflows/ipad-lab.yml'
   pull_request:
     paths:
