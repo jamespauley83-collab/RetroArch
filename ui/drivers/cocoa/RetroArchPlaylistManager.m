@@ -336,6 +336,13 @@ typedef void (^PlaylistEntryBlock)(const struct playlist_entry *entry, playlist_
     return games;
 }
 
++ (NSArray<RetroArchPlaylistGame *> *)getAllFavoriteGames
+{
+    return [self getGamesFromPlaylist:g_defaults.content_favorites
+                        withIdPrefix:@"favorites"
+                            maxGames:UINT32_MAX];
+}
+
 @end
 
 NS_ASSUME_NONNULL_END

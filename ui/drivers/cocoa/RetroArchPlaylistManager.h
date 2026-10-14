@@ -39,6 +39,7 @@ NS_ASSUME_NONNULL_BEGIN
 // History and favorites support for App Intents suggestions
 + (NSArray<RetroArchPlaylistGame *> *)getHistoryGames;
 + (NSArray<RetroArchPlaylistGame *> *)getFavoriteGames;
++ (NSArray<RetroArchPlaylistGame *> *)getAllFavoriteGames;
 
 @end
 
