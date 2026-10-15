@@ -46,6 +46,27 @@ class LibraryWiringTests(unittest.TestCase):
         self.assertIn('@"Switch games?"', source)
         self.assertIn('!jit_available()', source)
 
+    def test_database_metadata_survives_both_playlist_loading_paths(self):
+        source = read('ui/drivers/cocoa/RetroArchPlaylistManager.m')
+        regular = source.split('+ (NSArray<RetroArchPlaylistGame *> * _Nonnull)getAllGames')[1]
+        regular = regular.split('+ (nullable RetroArchPlaylistGame *)findGameByFilename:')[0]
+        history_and_favorites = source.split('+ (NSArray<RetroArchPlaylistGame *> *)getGamesFromPlaylist:')[1]
+        history_and_favorites = history_and_favorites.split('+ (NSArray<RetroArchPlaylistGame *> *)getHistoryGames')[0]
+        for loader in (regular, history_and_favorites):
+            self.assertIn('if (entry->db_name && *entry->db_name)', loader)
+            self.assertIn('game.databaseName = [NSString stringWithUTF8String:entry->db_name];', loader)
+        self.assertIn('getGamesFromPlaylist:g_defaults.content_history', source)
+        self.assertIn('getGamesFromPlaylist:g_defaults.content_favorites', source)
+
+    def test_artwork_uses_entry_database_even_without_regular_playlist(self):
+        source = read('ui/drivers/cocoa/RetroArchLabLibrary.m')
+        reload = source.split('- (void)reloadLibrary')[1].split('- (void)filterLibrary')[0]
+        self.assertIn('game.system = systems[key] ?: @"Other / recent";', reload)
+        self.assertNotIn('game.databaseName =', reload)
+        self.assertIn('RALabArtworkPath([NSString stringWithUTF8String:directory],\n'
+                      '            game.databaseName, game.system, game.title)', source)
+        self.assertNotIn('stringByAppendingPathComponent:game.system', source)
+
     def test_all_favorites_does_not_change_shortcut_limit(self):
         source = read('ui/drivers/cocoa/RetroArchPlaylistManager.m')
         self.assertIn('maxGames:10', source)

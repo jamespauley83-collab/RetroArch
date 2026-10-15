@@ -168,6 +168,8 @@ typedef void (^PlaylistEntryBlock)(const struct playlist_entry *entry, playlist_
         game.gameId = [NSString stringWithFormat:@"%@:%@", playlistName, @(index)];
         game.title = [NSString stringWithUTF8String:entry->label];
         game.fullPath = [NSString stringWithUTF8String:entry->path];
+        if (entry->db_name && *entry->db_name)
+            game.databaseName = [NSString stringWithUTF8String:entry->db_name];
 
         /* System/playlist display name (strip trailing ".lpl") */
         if ([playlistName.pathExtension.lowercaseString isEqualToString:@"lpl"])
@@ -295,6 +297,8 @@ typedef void (^PlaylistEntryBlock)(const struct playlist_entry *entry, playlist_
             game.gameId = [NSString stringWithFormat:@"%@:%u", idPrefix, i];
             game.title = [NSString stringWithUTF8String:entry->label];
             game.fullPath = [NSString stringWithUTF8String:entry->path];
+            if (entry->db_name && *entry->db_name)
+                game.databaseName = [NSString stringWithUTF8String:entry->db_name];
             game.filename = [NSString stringWithUTF8String:path_basename(entry->path)];
 
             if (entry->core_path)

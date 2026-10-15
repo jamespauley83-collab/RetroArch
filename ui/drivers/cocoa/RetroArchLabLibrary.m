@@ -287,14 +287,13 @@ bool cocoa_lab_library_visible(void) { return ra_lab_library_visible; }
    cell.art.image = [UIImage systemImageNamed:@"gamecontroller"];
    cell.artPath = nil;
    settings_t *settings = config_get_ptr();
-   if (settings && game.system.length && game.title.length)
+   if (settings && game.title.length)
    {
       char directory[PATH_MAX_LENGTH];
       fill_pathname_expand_special(directory, settings->paths.directory_thumbnails, sizeof(directory));
-      NSString *path = [[[[NSString stringWithUTF8String:directory]
-            stringByAppendingPathComponent:game.system.lastPathComponent]
-            stringByAppendingPathComponent:@"Named_Boxarts"]
-            stringByAppendingPathComponent:RALabArtworkFilename(game.title)];
+      NSString *path = RALabArtworkPath([NSString stringWithUTF8String:directory],
+            game.databaseName, game.system, game.title);
+      if (!path) return cell;
       cell.artPath = path;
       UIImage *cached = [self.images objectForKey:path];
       if (cached) cell.art.image = cached;

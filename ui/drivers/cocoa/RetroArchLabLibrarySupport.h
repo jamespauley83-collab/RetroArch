@@ -12,7 +12,8 @@ static inline NSString *RALabCoreIdentifier(NSString *path)
    for (NSString *suffix in @[@"_libretro_ios.dylib", @"_libretro.dylib",
          @"_libretro.so", @".libretro.framework", @".libretro"])
       if ([name hasSuffix:suffix])
-         return [name substringToIndex:name.length - suffix.length];
+         return [[name substringToIndex:name.length - suffix.length]
+               stringByReplacingOccurrencesOfString:@"." withString:@"_"];
    return name;
 }
 
@@ -59,6 +60,27 @@ static inline NSString *RALabArtworkFilename(NSString *title)
    NSCharacterSet *invalid = [NSCharacterSet characterSetWithCharactersInString:@"&*/:`<>?\\|\""];
    NSString *name = [[title componentsSeparatedByCharactersInSet:invalid] componentsJoinedByString:@"_"];
    return [name stringByAppendingPathExtension:@"png"];
+}
+
+static inline NSString *RALabArtworkPath(NSString *directory, NSString *databaseName,
+      NSString *system, NSString *title)
+{
+   if (!directory.length || !title.length)
+      return nil;
+   NSString *folder = system.lastPathComponent;
+   if (databaseName.length)
+   {
+      folder = [databaseName componentsSeparatedByString:@"|"].firstObject.lastPathComponent;
+      if ([folder.pathExtension.lowercaseString isEqualToString:@"lpl"])
+         folder = folder.stringByDeletingPathExtension;
+      if ([folder hasPrefix:@"MAME"])
+         folder = @"MAME";
+   }
+   if (!folder.length || [folder isEqualToString:@"."] || [folder isEqualToString:@".."])
+      return nil;
+   return [[[directory stringByAppendingPathComponent:folder]
+         stringByAppendingPathComponent:@"Named_Boxarts"]
+         stringByAppendingPathComponent:RALabArtworkFilename(title)];
 }
 
 #endif
