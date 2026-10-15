@@ -39,6 +39,9 @@
  * in cocoa_common.h for non-qb builds; set directly by qb. */
 #include "../ui/drivers/cocoa/RetroArchPlaylistManager.m"
 #endif
+#if defined(HAVE_RETROARCH_LAB_LIBRARY) && TARGET_OS_IOS
+#include "../ui/drivers/cocoa/RetroArchLabLibrary.m"
+#endif
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
 #include "../gfx/drivers_context/cocoa_gl_ctx.m"
 #endif

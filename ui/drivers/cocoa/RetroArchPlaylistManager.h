@@ -20,6 +20,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong, nullable) NSString *coreName;
 // Display name of the playlist/system this game belongs to
 @property (nonatomic, strong, nullable) NSString *system;
+@property (nonatomic, strong, nullable) NSString *databaseName;
 @end
 
 // Unified playlist management class
@@ -39,6 +40,7 @@ NS_ASSUME_NONNULL_BEGIN
 // History and favorites support for App Intents suggestions
 + (NSArray<RetroArchPlaylistGame *> *)getHistoryGames;
 + (NSArray<RetroArchPlaylistGame *> *)getFavoriteGames;
++ (NSArray<RetroArchPlaylistGame *> *)getAllFavoriteGames;
 
 @end
 

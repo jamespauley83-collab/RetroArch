@@ -6,12 +6,18 @@ on:
     branches: [codex/ipad-retroarch-lab]
     paths:
       - 'pkg/apple/ipad-lab/**'
+      - 'ui/drivers/cocoa/**'
+      - 'ui/drivers/ui_cocoatouch.m'
+      - 'griffin/griffin_objc.m'
       - 'network/cloud_sync/icloud_drive.m'
       - 'samples/network/icloud_drive/**'
       - '.github/workflows/ipad-lab.yml'
   pull_request:
     paths:
       - 'pkg/apple/ipad-lab/**'
+      - 'ui/drivers/cocoa/**'
+      - 'ui/drivers/ui_cocoatouch.m'
+      - 'griffin/griffin_objc.m'
       - 'network/cloud_sync/icloud_drive.m'
       - 'samples/network/icloud_drive/**'
       - '.github/workflows/ipad-lab.yml'
@@ -36,6 +42,8 @@ jobs:
         run: |
           python3 pkg/apple/ipad-lab/build.py --check
           python3 -m unittest discover -s pkg/apple/ipad-lab/tests -v
+      - name: Test native library helpers and type-check the iOS screen
+        run: bash pkg/apple/ipad-lab/tests/check_library.sh
       - name: Test default and Lab iCloud Drive containers
         working-directory: samples/network/icloud_drive
         run: |
