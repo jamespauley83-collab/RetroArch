@@ -3,6 +3,7 @@ import hashlib
 import json
 from pathlib import Path
 import plistlib
+import re
 import shutil
 import subprocess
 import sys
@@ -14,6 +15,7 @@ import build as lab
 
 BUNDLE_ID = 'com.jamespauley.retroarchlab.ps2test'
 DISPLAY_NAME = 'RetroArch PS2 Test'
+MINIMUM_IOS = '17.4'
 CORE_INFO = '''display_name = "Sony - PlayStation 2 (ARMSX2 Lab Test)"
 corename = "ARMSX2 Lab Test"
 systemname = "PlayStation 2"
@@ -46,16 +48,38 @@ def customize_test_plist(path):
     path.write_bytes(plistlib.dumps(info))
 
 
-def verify_isolation(app):
-    info = plistlib.loads((app / 'Info.plist').read_bytes())
+def verify_test_info(info):
+    version = info.get('MinimumOSVersion')
+    if not isinstance(version, str) or not re.fullmatch(r'[0-9]+(?:\.[0-9]+){0,2}', version):
+        raise ValueError('Test app must declare MinimumOSVersion of iOS 17.4 or later.')
+    parts = tuple(int(part) for part in version.split('.'))
+    if parts + (0,) * (3 - len(parts)) < (17, 4, 0):
+        raise ValueError('Test app requires iOS 17.4 or later for its Metal shaders.')
+    if info.get('NSUbiquitousContainers'):
+        raise ValueError('Test app must not declare iCloud containers.')
     if info.get('CFBundleIdentifier') != BUNDLE_ID or info.get('CFBundleDisplayName') != DISPLAY_NAME:
         raise ValueError('Test app identity is not isolated.')
     if info.get('CFBundleURLTypes') != [{'CFBundleURLName': BUNDLE_ID,
                                        'CFBundleURLSchemes': ['retroarchps2test']}]:
         raise ValueError('Test app URL scheme is not isolated.')
+
+def verify_isolation(app):
+    verify_test_info(plistlib.loads((app / 'Info.plist').read_bytes()))
     cores = sorted(p.name for p in (app / 'Frameworks').glob('*.libretro.framework'))
     if cores != ['armsx2.libretro.framework']:
         raise ValueError('Test app must contain only the ARMSX2 core.')
+
+
+def verify_packaged_app(ipa):
+    with zipfile.ZipFile(ipa) as archive:
+        prefix = 'Payload/RetroArch.app/'
+        verify_test_info(plistlib.loads(archive.read(prefix + 'Info.plist')))
+        cores = {name[len(prefix):].split('/')[1] for name in archive.namelist()
+                 if name.startswith(prefix + 'Frameworks/')
+                 and len(name[len(prefix):].split('/')) > 2
+                 and name[len(prefix):].split('/')[1].endswith('.libretro.framework')}
+        if cores != {'armsx2.libretro.framework'}:
+            raise ValueError('Packaged test app must contain only the ARMSX2 core.')
 
 
 def main():
@@ -94,7 +118,7 @@ def main():
             '-xcconfig', str(apple / 'GitHubCI.xcconfig'),
             'IOS_BUNDLE_IDENTIFIER=' + BUNDLE_ID,
             'IOS_CODE_SIGN_ENTITLEMENTS=' + str(entitlements),
-            'RA_IPHONEOS_DEPLOYMENT_TARGET=17.4',
+            'RA_IPHONEOS_DEPLOYMENT_TARGET=' + MINIMUM_IOS,
             'ARCHS=arm64', 'ONLY_ACTIVE_ARCH=NO', 'DEVELOPMENT_TEAM=',
             'CODE_SIGNING_ALLOWED=NO', 'CODE_SIGNING_REQUIRED=NO',
             'CODE_SIGN_IDENTITY=-', 'PROVISIONING_PROFILE_SPECIFIER=', 'APPSTORE_BUILD=', 'build',
@@ -108,10 +132,12 @@ def main():
         'retroarch_commit': revision, 'bundle_id': BUNDLE_ID, 'display_name': DISPLAY_NAME,
         'stage': 'device-test', 'gameplay_enabled': True, 'device_signed': False,
         'device_tested': False, 'icloud_drive': {'enabled': False},
+        'minimum_ios': plistlib.loads((app / 'Info.plist').read_bytes())['MinimumOSVersion'],
         'cores': [{'name': 'armsx2', 'upstream_commit': core_manifest['upstream_commit'],
                    'patches': core_manifest['patches']}],
     }
     ipa = lab.package_app(app, work, artifacts, manifest)
+    verify_packaged_app(ipa)
     ipa.rename(artifacts / 'RetroArch-PS2-Test-unsigned.ipa')
     shutil.copy2(HERE / 'DEVICE-TEST.md', artifacts)
     shutil.copy2(source / 'COPYING', artifacts / 'RetroArch-COPYING')

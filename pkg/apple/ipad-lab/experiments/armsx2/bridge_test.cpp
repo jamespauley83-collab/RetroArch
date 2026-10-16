@@ -20,7 +20,7 @@ static_assert(RETRO_EXEC_MEM_MODE_RWX == 2 && RETRO_EXEC_MEM_MODE_DUAL_MAP == 4)
 alignas(16384) static unsigned char memory[32768];
 static unsigned mode = 4;
 static size_t limit = sizeof(memory) / 2;
-static bool malformed = false, fail = false;
+static bool malformed = false, fail = false, fail_free = false;
 static unsigned allocations = 0, frees = 0;
 static bool EnvironmentCallback(unsigned command, void* data)
 {
@@ -28,7 +28,7 @@ static bool EnvironmentCallback(unsigned command, void* data)
 	{
 		assert(static_cast<ReleaseRequest*>(data)->rx == memory);
 		++frees;
-		return true;
+		return !fail_free;
 	}
 	assert(command == 83);
 	auto& request = *static_cast<Allocation*>(data);
@@ -63,8 +63,8 @@ int main()
 	assert(frees == 2);
 	fail = false;
 	assert(arena.Prepare(EnvironmentCallback, 16384));
-	assert(arena.RX(16384) == memory && arena.RW() == memory + 16384);
-	assert(arena.RX(32768) == nullptr && arena.Offset() == 16384);
+	assert(arena.AcquireRX(16384) == memory && arena.RW() == memory + 16384);
+	assert(arena.AcquireRX(32768) == nullptr && arena.Offset() == 16384);
 	assert(arena.WritableForRX(memory + 12, 4) == memory + 16384 + 12);
 	assert(arena.WritableForRX(memory + 16380, 4) == memory + 32764);
 	assert(arena.WritableForRX(memory + 16380, 8) == nullptr);
@@ -73,14 +73,37 @@ int main()
 	unsigned before = allocations;
 	assert(arena.Prepare(EnvironmentCallback, 16384));
 	assert(allocations == before);
+	assert(!arena.AcquireRX(1) && !arena.AcquireRX(16384));
+	assert(!arena.ReturnRX(memory + 1, 16384));
+	assert(!arena.ReturnRX(memory, 8192));
+	assert(!arena.Release() && frees == 2);
+	assert(arena.ReturnRX(memory, 16384));
+	assert(!arena.ReturnRX(memory, 16384));
+	assert(!arena.WritableForRX(memory, 1));
 	arena.Release();
 	arena.Release();
 	assert(frees == 3 && !arena.Ready());
 	mode = 2;
 	assert(arena.Prepare(EnvironmentCallback, 16384));
-	assert(arena.RX(16384) == arena.RW() && arena.Offset() == 0);
+	assert(arena.AcquireRX(16384) == arena.RW() && arena.Offset() == 0);
+	assert(arena.ReturnRX(memory, 16384));
 	arena.Release();
 	assert(frees == 4);
+	assert(!arena.AcquireRX(1));
+	assert(arena.Prepare(EnvironmentCallback, 16384));
+	assert(!arena.AcquireRX(0) && !arena.AcquireRX(16385));
+	// The startup execution probe borrows only its instruction span.
+	assert(arena.AcquireRX(8) == memory);
+	assert(arena.WritableForRX(memory + 4, 4) == memory + 4);
+	assert(!arena.WritableForRX(memory + 4, 8));
+	assert(arena.ReturnRX(memory, 8));
+	assert(arena.AcquireRX(16384) == memory);
+	assert(arena.ReturnRX(memory, 16384));
+	fail_free = true;
+	assert(!arena.Release() && arena.Ready());
+	fail_free = false;
+	assert(arena.Release() && !arena.Ready());
+	assert(frees == 6);
 
 	FrameMailbox mailbox;
 	Frame output;

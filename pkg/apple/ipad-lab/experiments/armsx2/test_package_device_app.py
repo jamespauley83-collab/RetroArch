@@ -3,9 +3,10 @@ from pathlib import Path
 import plistlib
 import tempfile
 import unittest
+import zipfile
 
 from package_device_app import (BUNDLE_ID, customize_test_plist,
-                                validate_core_manifest, verify_isolation)
+                                validate_core_manifest, verify_isolation, verify_packaged_app)
 
 
 class DevicePackageValidation(unittest.TestCase):
@@ -27,7 +28,7 @@ class DevicePackageValidation(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             app = Path(directory)
             info_path = app / 'Info.plist'
-            info_path.write_bytes(plistlib.dumps({'CFBundleIdentifier': BUNDLE_ID}))
+            info_path.write_bytes(plistlib.dumps({'CFBundleIdentifier': BUNDLE_ID, 'MinimumOSVersion': '17.4'}))
             customize_test_plist(info_path)
             frameworks = app / 'Frameworks'
             (frameworks / 'armsx2.libretro.framework').mkdir(parents=True)
@@ -43,6 +44,57 @@ class DevicePackageValidation(unittest.TestCase):
                 info_path.write_bytes(plistlib.dumps(dict(good, **{field: value})))
                 with self.subTest(field=field), self.assertRaises(ValueError):
                     verify_isolation(app)
+
+    def test_final_app_and_ipa_require_ios_17_4(self):
+        with tempfile.TemporaryDirectory() as directory:
+            app = Path(directory) / 'RetroArch.app'
+            (app / 'Frameworks/armsx2.libretro.framework').mkdir(parents=True)
+            info_path = app / 'Info.plist'
+            info_path.write_bytes(plistlib.dumps({'CFBundleIdentifier': BUNDLE_ID}))
+            customize_test_plist(info_path)
+            original = plistlib.loads(info_path.read_bytes())
+            for version in [None, '', '15.0', '17', '17.3.99', '17.4beta',
+                            '17.4.0.1', 17.4, True, '17.4', '17.4.0', '17.4.1', '18.0']:
+                with self.subTest(version=version):
+                    info = dict(original)
+                    if version is not None:
+                        info['MinimumOSVersion'] = version
+                    info_path.write_bytes(plistlib.dumps(info))
+                    ipa = Path(directory) / 'test.ipa'
+                    with zipfile.ZipFile(ipa, 'w') as archive:
+                        archive.write(info_path, 'Payload/RetroArch.app/Info.plist')
+                        archive.writestr('Payload/RetroArch.app/Frameworks/'
+                                         'armsx2.libretro.framework/armsx2.libretro', b'fixture')
+                    if version in ('17.4', '17.4.0', '17.4.1', '18.0'):
+                        verify_isolation(app)
+                        verify_packaged_app(ipa)
+                    else:
+                        with self.assertRaisesRegex(ValueError, 'iOS 17.4'):
+                            verify_isolation(app)
+                        with self.assertRaisesRegex(ValueError, 'iOS 17.4'):
+                            verify_packaged_app(ipa)
+
+    def test_final_ipa_rejects_shared_identity_cloud_and_extra_core(self):
+        with tempfile.TemporaryDirectory() as directory:
+            info_path = Path(directory) / 'Info.plist'
+            info_path.write_bytes(plistlib.dumps({'CFBundleIdentifier': BUNDLE_ID,
+                                                  'MinimumOSVersion': '17.4'}))
+            customize_test_plist(info_path)
+            original = plistlib.loads(info_path.read_bytes())
+            for field, value in [('CFBundleIdentifier', 'com.jamespauley.retroarchlab'),
+                                 ('CFBundleURLTypes', []),
+                                 ('NSUbiquitousContainers', {'iCloud.shared': {}}),
+                                 ('extra_core', True)]:
+                with self.subTest(field=field):
+                    ipa = Path(directory) / 'test.ipa'
+                    with zipfile.ZipFile(ipa, 'w') as archive:
+                        archive.writestr('Payload/RetroArch.app/Info.plist',
+                                         plistlib.dumps(dict(original, **{field: value})))
+                        for core in (['armsx2', 'play'] if field == 'extra_core' else ['armsx2']):
+                            archive.writestr('Payload/RetroArch.app/Frameworks/' + core +
+                                             '.libretro.framework/' + core + '.libretro', b'fixture')
+                    with self.assertRaises(ValueError):
+                        verify_packaged_app(ipa)
 
 
 if __name__ == '__main__':

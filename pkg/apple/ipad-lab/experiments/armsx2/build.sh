@@ -32,13 +32,7 @@ for patch in "$HERE"/patches/*.patch; do
     git -C "$SOURCE" apply "$patch"
 done
 
-# Compile the actual gate with the pinned upstream libretro API.
-c++ -std=c++17 -I"$SOURCE/3rdparty/libretro" -I"$SOURCE/pcsx2-libretro" \
-    "$HERE/gate_test.cpp" -o "$WORK/gate-test"
-"$WORK/gate-test"
-c++ -std=c++17 -Wall -Wextra -Werror -pthread -I"$SOURCE" -I"$ROOT" \
-    "$HERE/bridge_test.cpp" -o "$WORK/bridge-test"
-"$WORK/bridge-test"
+python3 "$HERE/run_native_tests.py" "$SOURCE" "$ROOT" "$WORK/native-tests"
 
 cd "$SOURCE"
 APPLE_PLATFORM=ios APPLE_DEPLOYMENT_TARGET=17.4 \

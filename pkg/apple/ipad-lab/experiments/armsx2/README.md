@@ -55,10 +55,26 @@ alias translation. It does not independently map, protect or unmap frontend
 memory. Cache synchronization flushes the writable alias before invalidating the
 executable alias. The frontend thread frees the arena after CPU/GS shutdown.
 
+Patch 0004 gives the VM one exclusive code-arena borrow. Repeated/invalid
+requests fail, and only the exact address and size can return the borrow.
+Unmatched unmaps leave the active alias metadata intact. VM memory reset keeps
+the reservation; matched unmap permits reuse, and frontend release refuses
+outstanding borrows. The startup execution check returns its temporary borrow
+before VM allocation.
+
 Native tests check the ABI against Lab’s libretro header and cover rejected allocations, cleanup of malformed replies, exact
 ownership, repeated allocation/release, pixel channel order, frame replacement,
 invalid sizes, clearing and concurrent production/consumption. They do not
-execute generated ARM64 code or exercise Metal.
+execute generated ARM64 code or exercise Metal. The Darwin map/unmap and
+SysMemory reset tests compile those functions directly from the patched source,
+with data-reset calls stubbed; full VM reset remains a device check.
+
+Portable checks after applying all patches to the pinned source:
+
+```sh
+python3 pkg/apple/ipad-lab/experiments/armsx2/run_native_tests.py /path/to/ARMSX2 . /tmp/armsx2-tests
+python3 -m unittest discover -s pkg/apple/ipad-lab/experiments/armsx2 -p 'test_*.py' -v
+```
 
 The initial Xcode build (Actions run 38837401507) compiled but failed linking
 because CMake's object-library link inputs expected GS.o while Xcode emitted
@@ -74,7 +90,9 @@ Patch 0003 adds the explicit device variant: no-content BIOS boot, an ARM64
 execute/patch/cache preflight, asynchronous boot-error reporting, and offscreen
 Metal initialization without dispatching unnecessary UI work. Its test app uses
 `com.jamespauley.retroarchlab.ps2test`, one core, and no iCloud feature flag or
-entitlements. Packaging verifies app identity, URL scheme, core count and hashes.
+entitlements. Packaging verifies app identity, URL scheme, core count and hashes. Both the
+built app and final IPA must declare a minimum iOS version of at least 17.4;
+missing, malformed or older values fail packaging.
 
 ## Remaining validation
 
