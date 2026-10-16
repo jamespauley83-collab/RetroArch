@@ -1,4 +1,5 @@
 """Reject non-iOS, incomplete, or externally dependent prototype binaries."""
+import argparse
 import hashlib
 import json
 from pathlib import Path
@@ -48,8 +49,25 @@ def output(*args):
     return subprocess.check_output(args, text=True)
 
 
+def validate_stage(data, stage):
+    probe = b'ARMSX2 Lab build probe: gameplay disabled' in data
+    device = b'ARMSX2 Lab device test: experimental boot' in data
+    if stage == 'build-probe' and (not probe or device):
+        raise ValueError('Expected a gameplay-disabled build probe.')
+    if stage == 'device-test' and (probe or not device):
+        raise ValueError('Expected the explicit experimental device-test core.')
+    if stage not in ('build-probe', 'device-test'):
+        raise ValueError('Unknown build stage.')
+
+
 def main():
-    binary, artifacts, source = map(Path, sys.argv[1:])
+    parser = argparse.ArgumentParser()
+    parser.add_argument('binary', type=Path)
+    parser.add_argument('artifacts', type=Path)
+    parser.add_argument('source', type=Path)
+    parser.add_argument('--stage', choices=['build-probe', 'device-test'], default='build-probe')
+    args = parser.parse_args()
+    binary, artifacts, source = args.binary, args.artifacts, args.source
     if output('git', '-C', str(source), 'rev-parse', 'HEAD').strip() != PIN:
         raise ValueError('Source pin mismatch.')
     reports = {
@@ -59,9 +77,7 @@ def main():
         'dependencies': output('xcrun', 'otool', '-L', str(binary)),
     }
     dependencies = validate(**reports)
-    # Verify the built executable retained the explicit load gate.
-    if b'ARMSX2 Lab build probe: gameplay disabled' not in binary.read_bytes():
-        raise ValueError('Prototype load gate missing from binary.')
+    validate_stage(binary.read_bytes(), args.stage)
     artifacts.mkdir(parents=True, exist_ok=True)
     shutil.copy2(binary, artifacts / binary.name)
     here = Path(__file__).resolve().parent
@@ -69,7 +85,7 @@ def main():
         'upstream_repository': 'https://github.com/ARMSX2/ARMSX2',
         'upstream_commit': PIN,
         'lab_commit': output('git', '-C', str(here), 'rev-parse', 'HEAD').strip(),
-        'stage': 'build-probe', 'gameplay_enabled': False,
+        'stage': args.stage, 'gameplay_enabled': args.stage == 'device-test',
         'device_signed': False, 'device_tested': False,
         'architecture': 'arm64', 'platform': 'iOS', 'minimum_ios': '17.4',
         'binary': binary.name,

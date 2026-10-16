@@ -1,8 +1,19 @@
 import unittest
-from verify import REQUIRED, validate
+from verify import REQUIRED, validate, validate_stage
 
 
 class ArtifactValidation(unittest.TestCase):
+    def test_stage_markers_cannot_be_mixed_or_swapped(self):
+        probe = b'ARMSX2 Lab build probe: gameplay disabled'
+        device = b'ARMSX2 Lab device test: experimental boot'
+        validate_stage(probe, 'build-probe')
+        validate_stage(device, 'device-test')
+        for stage, data in [('device-test', probe), ('build-probe', device),
+                            ('device-test', probe + device), ('build-probe', probe + device),
+                            ('device-test', b''), ('build-probe', b'')]:
+            with self.subTest(stage=stage, data=data), self.assertRaises(ValueError):
+                validate_stage(data, stage)
+
     def setUp(self):
         self.report = dict(
             architectures='arm64\n',

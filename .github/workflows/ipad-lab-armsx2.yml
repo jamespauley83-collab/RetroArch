@@ -15,6 +15,10 @@ jobs:
     if: github.repository == 'jamespauley83-collab/RetroArch'
     runs-on: macos-15
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        stage: [build-probe, device-test]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -28,11 +32,14 @@ jobs:
       - name: Test artifact validation
         run: python3 -m unittest discover -s pkg/apple/ipad-lab/experiments/armsx2 -p 'test_*.py' -v
       - name: Build isolated iOS core probe
-        run: bash pkg/apple/ipad-lab/experiments/armsx2/build.sh
-      - name: Upload verified build probe and sources
+        run: bash pkg/apple/ipad-lab/experiments/armsx2/build.sh "${{ matrix.stage }}"
+      - name: Package isolated device-test app
+        if: matrix.stage == 'device-test'
+        run: python3 -u pkg/apple/ipad-lab/experiments/armsx2/package_device_app.py
+      - name: Upload verified core, app if applicable, and sources
         uses: actions/upload-artifact@v4
         with:
-          name: ARMSX2-iOS-build-probe-${{ github.sha }}
+          name: ARMSX2-iOS-${{ matrix.stage }}-${{ github.sha }}
           path: .armsx2-prototype/artifacts/*
           include-hidden-files: true
           if-no-files-found: error
@@ -41,7 +48,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ARMSX2-iOS-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          name: ARMSX2-iOS-diagnostics-${{ matrix.stage }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             .armsx2-prototype/*.log
             .armsx2-prototype/build/CMakeCache.txt

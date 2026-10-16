@@ -7,6 +7,12 @@ WORK="$ROOT/.armsx2-prototype"
 SOURCE="$WORK/source"
 ARTIFACTS="$WORK/artifacts"
 PIN=e58489d349cdcd635fc6264546087e347c84bf8c
+STAGE="${1:-build-probe}"
+case "$STAGE" in
+    build-probe) PROBE=ON; DEVICE_TEST=OFF ;;
+    device-test) PROBE=OFF; DEVICE_TEST=ON ;;
+    *) echo 'Expected build-probe or device-test.' >&2; exit 1 ;;
+esac
 
 if [ "$(uname -s)" != Darwin ]; then
     echo 'This experiment requires macOS with the iPhoneOS SDK.' >&2
@@ -57,13 +63,14 @@ cmake -S "$SOURCE" -B "$WORK/build" -G Ninja \
     -DENABLE_SETCAP=OFF -DUSE_BACKTRACE=OFF -DX11_API=OFF -DWAYLAND_API=OFF \
     -DUSE_VULKAN=OFF -DUSE_OPENGL=OFF -DDISABLE_ADVANCE_SIMD=TRUE \
     -DARMSX2_EMBED_RESOURCES=ON -DARMSX2_EMBED_PATCHES=OFF \
-    -DRETROARCH_LAB_ARMSX2_BRIDGE=ON -DRETROARCH_LAB_ARMSX2_BUILD_PROBE=ON \
+    -DRETROARCH_LAB_ARMSX2_BRIDGE=ON -DRETROARCH_LAB_ARMSX2_BUILD_PROBE="$PROBE" \
+    -DRETROARCH_LAB_ARMSX2_DEVICE_TEST="$DEVICE_TEST" \
     2>&1 | tee "$WORK/configure.log"
 cmake --build "$WORK/build" --config Release --target pcsx2-libretro --parallel 4 \
     2>&1 | tee "$WORK/build.log"
 
 BINARY="$WORK/build/core/armsx2_libretro.dylib"
-python3 "$HERE/verify.py" "$BINARY" "$ARTIFACTS" "$SOURCE"
+python3 "$HERE/verify.py" "$BINARY" "$ARTIFACTS" "$SOURCE" --stage "$STAGE"
 cp "$HERE/README.md" "$ARTIFACTS/README.md"
 cp "$SOURCE/COPYING.GPLv3" "$ARTIFACTS/ARMSX2-COPYING.GPLv3"
 cp "$SOURCE/deps-build/SHASUMS" "$ARTIFACTS/dependency-SHASUMS"
