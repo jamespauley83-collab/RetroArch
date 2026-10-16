@@ -46,9 +46,10 @@ executable-memory ABI v1. Only RWX and dual-map allocations are accepted. Missin
 callbacks, unsupported modes, undersized arenas and invalid aliases fail before
 VM startup. Darwin's allocator borrows this arena and uses the existing writable
 alias translation. It does not independently map, protect or unmap frontend
-memory. The frontend thread frees the arena after CPU/GS shutdown.
+memory. Cache synchronization flushes the writable alias before invalidating the
+executable alias. The frontend thread frees the arena after CPU/GS shutdown.
 
-Native tests cover rejected allocations, cleanup of malformed replies, exact
+Native tests check the ABI against Lab’s libretro header and cover rejected allocations, cleanup of malformed replies, exact
 ownership, repeated allocation/release, pixel channel order, frame replacement,
 invalid sizes, clearing and concurrent production/consumption. They do not
 execute generated ARM64 code or exercise Metal.

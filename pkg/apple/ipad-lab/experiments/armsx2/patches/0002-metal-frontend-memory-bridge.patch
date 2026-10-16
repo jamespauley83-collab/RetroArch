@@ -117,10 +117,10 @@ index d73b158..6ea8e7a 100644
  	if (rx_ptr)
 diff --git a/common/LabFrontend.h b/common/LabFrontend.h
 new file mode 100644
-index 0000000..dcbf7c3
+index 0000000..b4276f3
 --- /dev/null
 +++ b/common/LabFrontend.h
-@@ -0,0 +1,113 @@
+@@ -0,0 +1,121 @@
 +#pragma once
 +
 +#include <cstddef>
@@ -181,6 +181,14 @@ index 0000000..dcbf7c3
 +		m_environment = nullptr;
 +	}
 +	void* RX(size_t size) const { return size <= m_allocation.size ? m_allocation.rx : nullptr; }
++	void* WritableForRX(void* address, size_t size) const
++	{
++		const uintptr_t base = reinterpret_cast<uintptr_t>(m_allocation.rx);
++		const uintptr_t pointer = reinterpret_cast<uintptr_t>(address);
++		if (!base || pointer < base || pointer - base > m_allocation.size ||
++			size > m_allocation.size - (pointer - base)) return nullptr;
++		return static_cast<unsigned char*>(m_allocation.rw) + (pointer - base);
++	}
 +	void* RW() const { return m_allocation.rw; }
 +	bool Ready() const { return m_allocation.rx != nullptr; }
 +	ptrdiff_t Offset() const
@@ -234,6 +242,31 @@ index 0000000..dcbf7c3
 +};
 +inline FrameMailbox Frames;
 +}
+diff --git a/common/Linux/LnxHostSys.cpp b/common/Linux/LnxHostSys.cpp
+index 6e3e240..5e61f59 100644
+--- a/common/Linux/LnxHostSys.cpp
++++ b/common/Linux/LnxHostSys.cpp
+@@ -1,6 +1,9 @@
+ // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
+ // SPDX-License-Identifier: GPL-3.0+
+ 
++#ifdef RETROARCH_LAB_ARMSX2_BRIDGE
++#include "common/LabFrontend.h"
++#endif
+ #include "common/Assertions.h"
+ #include "common/BitUtils.h"
+ #include "common/Console.h"
+@@ -352,6 +355,10 @@ bool SharedMemoryMappingArea::Unmap(void* map_base, size_t map_size, bool is_fil
+ void HostSys::FlushInstructionCache(void* address, u32 size)
+ {
+ #ifdef __APPLE__
++#ifdef RETROARCH_LAB_ARMSX2_BRIDGE
++	if (void* writable = LabFrontend::Code.WritableForRX(address, size))
++		sys_dcache_flush(writable, size);
++#endif
+ 	sys_icache_invalidate(address, size);
+ #else
+ 	__builtin___clear_cache(reinterpret_cast<char*>(address), reinterpret_cast<char*>(address) + size);
 diff --git a/pcsx2-libretro/CMakeLists.txt b/pcsx2-libretro/CMakeLists.txt
 index e6ef8fe..4f1f391 100644
 --- a/pcsx2-libretro/CMakeLists.txt

@@ -30,7 +30,7 @@ done
 c++ -std=c++17 -I"$SOURCE/3rdparty/libretro" -I"$SOURCE/pcsx2-libretro" \
     "$HERE/gate_test.cpp" -o "$WORK/gate-test"
 "$WORK/gate-test"
-c++ -std=c++17 -Wall -Wextra -Werror -pthread -I"$SOURCE" \
+c++ -std=c++17 -Wall -Wextra -Werror -pthread -I"$SOURCE" -I"$ROOT" \
     "$HERE/bridge_test.cpp" -o "$WORK/bridge-test"
 "$WORK/bridge-test"
 

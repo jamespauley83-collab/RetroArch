@@ -1,4 +1,6 @@
 #include "common/LabFrontend.h"
+#include "libretro-common/include/libretro.h"
+#include <type_traits>
 #include <atomic>
 #include <cassert>
 #include <cstring>
@@ -6,6 +8,15 @@
 #include <thread>
 
 using namespace LabFrontend;
+static_assert(sizeof(Allocation) == sizeof(retro_exec_mem_alloc));
+static_assert(offsetof(Allocation, version) == offsetof(retro_exec_mem_alloc, version));
+static_assert(offsetof(Allocation, size) == offsetof(retro_exec_mem_alloc, size));
+static_assert(offsetof(Allocation, mode) == offsetof(retro_exec_mem_alloc, mode));
+static_assert(offsetof(Allocation, rx) == offsetof(retro_exec_mem_alloc, rx));
+static_assert(offsetof(Allocation, rw) == offsetof(retro_exec_mem_alloc, rw));
+static_assert(std::is_same<Environment, retro_environment_t>::value);
+static_assert(RETRO_ENVIRONMENT_EXEC_MEM_ALLOC == 83 && RETRO_ENVIRONMENT_EXEC_MEM_FREE == 84);
+static_assert(RETRO_EXEC_MEM_MODE_RWX == 2 && RETRO_EXEC_MEM_MODE_DUAL_MAP == 4);
 alignas(16384) static unsigned char memory[32768];
 static unsigned mode = 4;
 static size_t limit = sizeof(memory) / 2;
@@ -54,6 +65,11 @@ int main()
 	assert(arena.Prepare(EnvironmentCallback, 16384));
 	assert(arena.RX(16384) == memory && arena.RW() == memory + 16384);
 	assert(arena.RX(32768) == nullptr && arena.Offset() == 16384);
+	assert(arena.WritableForRX(memory + 12, 4) == memory + 16384 + 12);
+	assert(arena.WritableForRX(memory + 16380, 4) == memory + 32764);
+	assert(arena.WritableForRX(memory + 16380, 8) == nullptr);
+	assert(arena.WritableForRX(memory + 16384, 1) == nullptr);
+	assert(arena.WritableForRX(nullptr, 4) == nullptr);
 	unsigned before = allocations;
 	assert(arena.Prepare(EnvironmentCallback, 16384));
 	assert(allocations == before);

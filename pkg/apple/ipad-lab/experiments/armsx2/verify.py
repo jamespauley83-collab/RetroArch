@@ -79,7 +79,8 @@ def main():
         'dependencies': dependencies,
         'xcode': output('xcodebuild', '-version').strip(),
         'sdk': output('xcrun', '--sdk', 'iphoneos', '--show-sdk-version').strip(),
-        'remaining': ['frontend graphics handoff', 'frontend JIT memory integration',
+        'bridges': {'graphics': 'Metal CPU readback', 'jit': 'frontend RWX/dual-map arena'},
+        'remaining': ['device graphics and JIT validation', 'frame pacing and readback optimization',
                       'isolated app packaging', 'device gameplay/audio/save testing'],
     }
     (artifacts / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
