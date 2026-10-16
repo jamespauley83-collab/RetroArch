@@ -1,0 +1,64 @@
+diff --git a/Source/ui_libretro/SH_LibreAudio.cpp b/Source/ui_libretro/SH_LibreAudio.cpp
+index 42067f7..25bf985 100644
+--- a/Source/ui_libretro/SH_LibreAudio.cpp
++++ b/Source/ui_libretro/SH_LibreAudio.cpp
+@@ -1,10 +1,12 @@
+ #include "SH_LibreAudio.h"
+ #include "ext/libretro.h"
+-#include <cstring>
++#include <algorithm>
+ #include <mutex>
+ 
+ extern retro_audio_sample_batch_t g_set_audio_sample_batch_cb;
+-std::mutex m_buffer_lock;
++
++// One second at the VM's fixed 44100 Hz stereo output rate.
++static constexpr size_t MAX_BUFFER_SAMPLES = 44100 * 2;
+ 
+ CSoundHandler* CSH_LibreAudio::HandlerFactory()
+ {
+@@ -13,29 +15,34 @@ CSoundHandler* CSH_LibreAudio::HandlerFactory()
+ 
+ void CSH_LibreAudio::Write(int16* buffer, unsigned int sampleCount, unsigned int sampleRate)
+ {
++	if(!buffer || sampleCount < 2) return;
+ 	std::lock_guard<std::mutex> lock(m_buffer_lock);
+-	m_buffer.resize(sampleCount * sizeof(int16));
+-	memcpy(m_buffer.data(), buffer, sampleCount * sizeof(int16));
++	const size_t samples = sampleCount - (sampleCount % 2);
++	const size_t count = std::min(samples, MAX_BUFFER_SAMPLES);
++	if(m_buffer.size() + count > MAX_BUFFER_SAMPLES)
++		m_buffer.erase(m_buffer.begin(), m_buffer.begin() + (m_buffer.size() + count - MAX_BUFFER_SAMPLES));
++	m_buffer.insert(m_buffer.end(), buffer + samples - count, buffer + samples);
+ }
+ 
+ void CSH_LibreAudio::ProcessBuffer()
+ {
+-	if(!m_buffer.empty())
+-	{
+-		std::lock_guard<std::mutex> lock(m_buffer_lock);
+-		if(g_set_audio_sample_batch_cb)
+-			g_set_audio_sample_batch_cb(m_buffer.data(), m_buffer.size() / (2 * sizeof(int16)));
+-		m_buffer.clear();
+-	}
++	std::lock_guard<std::mutex> lock(m_buffer_lock);
++	if(m_buffer.empty() || !g_set_audio_sample_batch_cb) return;
++	const size_t frames = m_buffer.size() / 2;
++	const size_t consumed = std::min(frames, g_set_audio_sample_batch_cb(m_buffer.data(), frames));
++	m_buffer.erase(m_buffer.begin(), m_buffer.begin() + consumed * 2);
+ }
+ 
+ bool CSH_LibreAudio::HasFreeBuffers()
+ {
+-	return false;
++	std::lock_guard<std::mutex> lock(m_buffer_lock);
++	return m_buffer.size() < MAX_BUFFER_SAMPLES;
+ }
+ 
+ void CSH_LibreAudio::Reset()
+ {
++	std::lock_guard<std::mutex> lock(m_buffer_lock);
++	m_buffer.clear();
+ }
+ 
+ void CSH_LibreAudio::RecycleBuffers()

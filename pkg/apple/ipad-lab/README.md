@@ -203,6 +203,9 @@ performance. Those checks require the signed build running on the iPad.
 
 ## Play! (PlayStation 2)
 
+See [PS2 development](PS2-DEVELOPMENT.md) for the audio-buffer refinement,
+PCSX2-derived ARM64 candidates, and the device comparison procedure.
+
 The Lab build includes `play.libretro.framework`, compiled from the pinned Play!
 revision in `cores.lock.json`. Its source and dependency revisions are included
 in the build artifact and manifest. Core metadata is from libretro-core-info blob
