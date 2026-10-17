@@ -272,6 +272,14 @@ def build(root):
                 repo / 'deps/CodeGen/src/MemoryFunction.cpp',
                 source / LAB / 'tests/play_jit_memory.cpp', '-o', test)
             run(test)
+            audio_test = work / 'play-audio-buffer-test'
+            run('c++', '-std=c++17', '-pthread',
+                '-I' + str(repo / 'Source'),
+                '-I' + str(repo / 'Source/ui_libretro'),
+                '-I' + str(repo / 'deps/Framework/include'),
+                repo / 'Source/ui_libretro/SH_LibreAudio.cpp',
+                source / LAB / 'tests/play_audio_buffer.cpp', '-o', audio_test)
+            run(audio_test)
         # Include the exact modified core sources with the binary artifact.
         run('tar', '--exclude=.git', '-czf', artifacts / (core['name'] + '-source.tar.gz'), '-C', repo, '.')
         binary = compile_core(core, repo, work, lock['minimum_ios'])
@@ -301,6 +309,7 @@ def build(root):
     ipa = package_app(app, work, artifacts, manifest)
     shutil.copy2(source / 'COPYING', artifacts / 'RetroArch-COPYING')
     shutil.copy2(source / LAB / 'README.md', artifacts / 'README.md')
+    shutil.copy2(source / LAB / 'PS2-DEVELOPMENT.md', artifacts / 'PS2-DEVELOPMENT.md')
     print('Build complete: ' + str(ipa), flush=True)
     print('This IPA requires device signing before installation.', flush=True)
 
