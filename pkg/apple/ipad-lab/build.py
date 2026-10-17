@@ -45,7 +45,7 @@ def load_lock(path):
         if recipe == 'make':
             if not re.fullmatch(r'Makefile[\w.-]*', core['makefile']):
                 raise ValueError('Expected a core Makefile in its repository root.')
-        elif recipe != 'dolphin-cmake' or name != 'dolphin':
+        elif (recipe, name) not in (('dolphin-cmake', 'dolphin'), ('play-cmake', 'play')):
             raise ValueError('Unsupported core build recipe.')
     return lock
 
@@ -58,6 +58,14 @@ def prepare_dolphin(repo):
                   if line.split()[1] not in ('Externals/Qt', 'Externals/FFmpeg-bin')]
     run('git', 'submodule', 'update', '--init', '--recursive', '--depth=1',
         '--', *submodules, cwd=repo)
+    return output('git', 'submodule', 'status', '--recursive', cwd=repo)
+
+
+def prepare_play(repo):
+    # AltKit belongs to the standalone app, not the libretro core.
+    run('git', 'submodule', 'update', '--init', '--recursive', '--depth=1',
+        '--', 'deps/Dependencies', 'deps/Framework', 'deps/CodeGen',
+        'deps/Nuanceur', 'deps/libchdr', cwd=repo)
     return output('git', 'submodule', 'status', '--recursive', cwd=repo)
 
 
@@ -77,6 +85,18 @@ def compile_core(core, repo, work, minimum_ios):
                     '-DCMAKE_OSX_DEPLOYMENT_TARGET=' + minimum_ios, '-DLIBRETRO=ON'])
             logged(['cmake', '--build', directory, '--target', 'dolphin_libretro', '-j', jobs])
             return directory / 'dolphin_libretro.dylib'
+        if core.get('recipe') == 'play-cmake':
+            directory = repo / 'build/ios-arm64'
+            logged(['cmake', '-S', repo, '-B', directory, '-G', 'Xcode',
+                    '-DCMAKE_TOOLCHAIN_FILE=' + str(repo / 'deps/Dependencies/cmake-ios/ios.cmake'),
+                    '-DTARGET_IOS=ON', '-DCMAKE_OSX_ARCHITECTURES=arm64',
+                    '-DCMAKE_CXX_FLAGS=-DIOS=1',
+                    '-DBUILD_PLAY=OFF', '-DBUILD_TESTS=OFF', '-DBUILD_LIBRETRO_CORE=ON',
+                    '-DENABLE_AMAZON_S3=OFF'])
+            logged(['cmake', '--build', directory, '--config', 'Release',
+                    '--target', 'play_libretro', '-j', jobs, '--',
+                    'IPHONEOS_DEPLOYMENT_TARGET=' + minimum_ios])
+            return directory / 'Source/ui_libretro/Release-iphoneos/play_libretro_ios.dylib'
         logged(['make', '-f', core['makefile'], 'platform=ios-arm64', '-j' + jobs])
         return repo / (core['name'] + '_libretro_ios.dylib')
 
@@ -235,12 +255,23 @@ def build(root):
         record = dict(core)
         if core.get('recipe') == 'dolphin-cmake':
             record['submodules'] = prepare_dolphin(repo)
+        elif core.get('recipe') == 'play-cmake':
+            record['submodules'] = prepare_play(repo)
         patches = sorted((source / LAB / 'patches' / core['name']).glob('*.patch'))
         patch_hashes = {}
         for patch in patches:
             run('git', 'apply', '--check', patch, cwd=repo)
             run('git', 'apply', patch, cwd=repo)
             patch_hashes[patch.name] = hashlib.sha256(patch.read_bytes()).hexdigest()
+        if core.get('recipe') == 'play-cmake':
+            test = work / 'play-jit-memory-test'
+            run('c++', '-std=c++17', '-pthread',
+                '-I' + str(repo / 'Source/ui_libretro'),
+                '-I' + str(repo / 'deps/CodeGen/include'),
+                '-I' + str(repo / 'deps/Framework/include'),
+                repo / 'deps/CodeGen/src/MemoryFunction.cpp',
+                source / LAB / 'tests/play_jit_memory.cpp', '-o', test)
+            run(test)
         # Include the exact modified core sources with the binary artifact.
         run('tar', '--exclude=.git', '-czf', artifacts / (core['name'] + '-source.tar.gz'), '-C', repo, '.')
         binary = compile_core(core, repo, work, lock['minimum_ios'])
