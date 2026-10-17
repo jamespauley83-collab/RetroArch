@@ -23,6 +23,13 @@
       "repository": "https://github.com/libretro/opera-libretro.git",
       "commit": "ea60917d7f8f79a19b46e1d8ecc6eca7be589b6a",
       "makefile": "Makefile"
+    },
+    {
+      "name": "dolphin",
+      "system": "Nintendo GameCube / Wii",
+      "repository": "https://github.com/libretro/dolphin.git",
+      "commit": "114977f115757b1d5506da93c825188233813ec1",
+      "recipe": "dolphin-cmake"
     }
   ]
 }
