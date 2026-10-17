@@ -109,7 +109,8 @@ Start at default settings and native/1x resolution.
 
 Yabause is the pinned v0.9.15 libretro core, **not YabaSanshiro**. Both Yabause
 dynamic recompilers were disabled in this build; it uses software rendering and
-does not require external JIT. Its iPad performance remains untested.
+does not require external JIT. James reports Saturn gameplay works in Lab 8 Test;
+extended-session performance has not been independently measured.
 
 ARMSX2 needs functional JIT for **RetroArch Lab 8 Test**, separately from PS2 Test
 and working Lab. Use the previously working activation method if compatible
@@ -120,7 +121,72 @@ crash as a failure, not a gameplay pass. Re-enable JIT after process termination
 when required by the activation method. Do not assume one successful activation
 persists across force quits, restarts, or app changes.
 
-## Focused physical tests — all initially pending
+### October 17 ARMSX2 failure: next diagnostic check
+
+The recovered 08:41 screenshot shows **Need for Speed - Most Wanted - Black
+Edition (USA)** in the Advanced menu, with the exact error:
+
+> ARMSX2 requires iOS 26+ with JIT enabled and a 305 MiB RWX/dual-map arena; WX-toggle is unsupported.
+
+This message is emitted only when `CodeArena::Prepare()` fails, before the
+execute/patch probe and VM boot. It does not identify which memory operation
+failed and does not establish a BIOS problem. The Advanced-menu route bypasses
+the native Library gate. James already reported that StikDebug showed successful
+JIT activation for **this test app** while the error persisted. Successful attach
+does not establish that the executable region was prepared successfully.
+
+The earlier troubleshooting asked for `universal.js` to be assigned to this app
+in StikDebug, followed by a fresh activation and ARMSX2 as the first core. The
+result of that script-specific retry is not recorded. Preserve that distinction;
+do not send James back through the already completed generic activation check.
+
+1. In this test app, enable **Settings > Logging > Logging Verbosity** and
+   **Log to File**, with frontend/core log levels at **1 (Info)**. Note
+   **Settings > Directory > Logs**, then save configuration. Copy any existing
+   failure log before restarting so it is not overwritten.
+2. Save/close any active content normally. If the script-specific retry is still
+   outstanding, use the established StikDebug setup to assign **universal.js**
+   to **RetroArch Lab 8 Test**, ID
+   `com.jamespauley.retroarchlab.eightcoretest`, and activate it for a fresh
+   process. Open ARMSX2 first, without force-quitting after activation.
+3. If it still fails, retain the **StikDebug script output** and the test app's
+   **RetroArch log** from that same attempt. Share copies through Files. These
+   two logs are needed to distinguish attach success from region preparation or
+   allocation failure. No reinstall, BIOS replacement or save migration is needed.
+4. Check the actual System/BIOS directory in this app only. Expected files are
+   `<System/BIOS>/pcsx2/bios/<BIOS file>` and
+   `<System/BIOS>/pcsx2/resources/fonts/Roboto-Regular.ttf`. A folder named
+   `System/BIOS` is not a literal required path; use the directory shown in
+   settings. Do not redirect it to another app or iCloud. BIOS validity remains
+   unverified until the memory check passes and BIOS boot runs.
+
+The source follow-up removes ARMSX2's duplicate generic Library gate, leaving
+the core's required allocation check authoritative for both entry points. It
+adds distinct failure messages plus an `ARMSX2 arena:` log with requested size,
+probe mode/capacity and returned allocation. Frontend `[JIT]` lines include the
+running bundle ID and failed mmap, region preparation or mirror operation.
+These new diagnostics require a newly compiled app; the existing Files-Fix IPA
+does not contain them. Modes 2/4 remain required; mode 3 is still rejected.
+
+| Evidence | Interpretation |
+| --- | --- |
+| `probe_mode=0`, no pool/CS_DEBUGGED | This process has no available executable arena; inspect activation for the logged app/PID. |
+| `probe_mode=3` | WX-toggle was offered and correctly rejected; verify installed OS/build rather than allowing this mode. |
+| `Pool/Arena TXM blessing failed` | Region preparation was not handled; inspect the assigned script and its output. |
+| mmap/vm_remap/mprotect error | Mapping failed; retain the numeric OS error. An attach-success message alone cannot fix this. |
+| `probe_bytes` below requested size | Insufficient remaining arena capacity; investigate prior core usage/teardown. |
+| `JIT execute/patch test passed` followed by BIOS/boot error | The arena check passed; investigate the subsequent error and recorded paths. |
+
+See [PS2-LAUNCH-INVESTIGATION-2026-10-17.md](PS2-LAUNCH-INVESTIGATION-2026-10-17.md)
+for source comparison and the separation between automated and device evidence.
+
+## Focused physical tests
+
+October 17 update: James reports the original library is intact and Yabause
+works in Lab 8 Test. ARMSX2 fails at arena preparation. Preserve those results;
+continue at the ARMSX2 diagnostic check before marking combined-app PS2, switching,
+save persistence or iCloud regression checks passed. Automated tests do not
+replace these device observations.
 
 Record app revision from the manifest, package SHA, iPad model/OS, signer/final
 ID, JIT method, BIOS region, exact game edition/title ID, and controller used.
