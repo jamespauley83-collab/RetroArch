@@ -15,7 +15,15 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
 jobs:
+  lab-scope:
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/ipad-change-scope.yml
+
   msys2-build-test:
+    needs: lab-scope
+    if: ${{ !cancelled() && needs.lab-scope.outputs.build != 'false' }}
     strategy:
       fail-fast: false
       matrix:
