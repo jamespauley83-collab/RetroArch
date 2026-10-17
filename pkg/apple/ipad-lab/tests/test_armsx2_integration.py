@@ -78,7 +78,7 @@ class Armsx2IntegrationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'archived patch checksum'):
             build.armsx2_inputs(self.root, self.revision)
 
-    def test_seventh_core_preserves_existing_cores_identity_and_cloud(self):
+    def test_additional_core_preserves_existing_cores_identity_and_cloud(self):
         modules = self.root / 'modules'
         modules.mkdir()
         (modules / 'play_libretro_ios.dylib').write_bytes(b'existing Play!')
@@ -112,7 +112,7 @@ class Armsx2IntegrationTests(unittest.TestCase):
         self.write_info()
         build.validate_app(self.app, self.lock)
         ipa, result = self.package()
-        self.assertEqual(len(result['cores']), 7)
+        self.assertEqual(len(result['cores']), len(original['cores']) + 1)
         with zipfile.ZipFile(ipa) as archive:
             last = result['cores'][-1]
             self.assertEqual(hashlib.sha256(archive.read(last['binary_path'])).hexdigest(), last['sha256'])

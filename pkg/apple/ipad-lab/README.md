@@ -2,7 +2,7 @@
 
 A separate native iOS build for testing emulator-core changes. The first baseline
 includes FCEUmm (NES/Famicom), Snes9x 2010 (SNES), Opera (3DO), Dolphin (GameCube/Wii),
-Play! (PlayStation 2), and Beetle Saturn (Sega Saturn),
+Play! (PlayStation 2), Beetle Saturn and Yabause (Sega Saturn),
 all compiled from source. Opera includes a local startup diagnostic patch.
 This is an initial development build, not a confirmed fix for any game.
 
@@ -42,14 +42,14 @@ Verify these before device signing, which can change the executable bytes.
 
 ## ARMSX2 integration candidate
 
-ARMSX2 is the recommended PS2 core for the optional seven-core candidate. On
+ARMSX2 is the recommended PS2 core for the optional eight-core candidate. On
 October 16, 2026, James reported that Need for Speed passed game boot, graphics,
 sound, controls, in-game save/load, and reopening/reloading in **RetroArch PS2
 Test**, and performed much better than Play!. The exact game edition, device/OS,
 and installed build revision were not recorded. This is a user-reported result
 for one game, not a benchmark or acceptance of every subsequent build.
 
-Pull requests run the seven-core candidate build. For a manual run, use
+Pull requests run the eight-core candidate build. For a manual run, use
 **RetroArch Lab iPad** with `with_armsx2` enabled on this integration branch.
 The workflow builds the corrected ARMSX2 device-test core from the same revision
 before adding it to the normal Lab app. For a local Mac build, prepare a fresh
@@ -61,9 +61,9 @@ python3 pkg/apple/ipad-lab/build.py --check --with-armsx2
 python3 -u pkg/apple/ipad-lab/build.py --with-armsx2
 ```
 
-This candidate requires **iOS 17.4+**. It retains the six existing cores, library,
+This candidate requires **iOS 17.4+**. It retains the seven baseline cores, library,
 Lab identity and iCloud configuration, adding ARMSX2 and its source provenance.
-The ordinary build without this option retains the six-core/iOS 15 baseline.
+The ordinary build without this option retains the seven-core/iOS 15 baseline.
 The combined app still needs its own build and device validation; the separate
 PS2 Test app result does not validate combined-app lifecycle or iCloud behavior.
 
@@ -101,6 +101,33 @@ in-game saving, restarting, and loading that save.
 Device signing, installation, and real iPad gameplay must still be verified.
 This build does not automatically enable JIT. Dolphin needs a separate JIT setup
 for practical performance, and Play! requires it to start a game; see below.
+
+## Yabause Saturn option
+
+Yabause is included at upstream revision
+`8926b0c6c347f8c5c755911ddb0ac695420ffbf8`, using the upstream ARM64 iOS Makefile
+with both dynamic recompilers disabled and the app's deployment target. It uses
+software rendering and does not require StikDebug/JIT. James requested Yabause
+as his preferred Saturn option; performance in this Lab build is still pending
+physical-device comparison. Beetle Saturn remains installed and existing Saturn
+playlist assignments stay unchanged.
+
+1. Put a copy of your Saturn BIOS in Lab's System/BIOS directory named
+   `saturn_bios.bin`. Preserve the originals used by Beetle Saturn. A real BIOS
+   is recommended and is required for multi-disc `.m3u` playback.
+2. In Advanced, choose **Load Core > Sega - Saturn (Yabause)** and load a `.chd`
+   or `.cue` with all referenced binary tracks. Assign Yabause explicitly to the
+   desired playlist entries to launch them from the native library.
+3. Use separate per-core save/state folders for comparison. Yabause writes its
+   own `<content-name>.srm` in the configured Save directory; Beetle uses its
+   own formats. Do not rename or convert Beetle saves or reuse its save states.
+4. Test graphics, audio, input, pause/resume, normal content close, and an in-game
+   save followed by app restart/reload. Compare the same game/scene against
+   Beetle. Keep normal close-content in the test: Yabause owns backup-RAM file
+   writes rather than exposing SRAM through RetroArch's memory callbacks.
+
+No BIOS or game files are included. See the
+[upstream Yabause documentation](https://docs.libretro.com/library/yabause/).
 
 ## Sega Saturn setup
 

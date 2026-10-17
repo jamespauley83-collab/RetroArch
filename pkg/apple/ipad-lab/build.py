@@ -45,7 +45,8 @@ def load_lock(path):
         if recipe == 'make':
             if not re.fullmatch(r'Makefile[\w.-]*', core['makefile']):
                 raise ValueError('Expected a core Makefile in its repository root.')
-        elif (recipe, name) not in (('dolphin-cmake', 'dolphin'), ('play-cmake', 'play')):
+        elif (recipe, name) not in (('dolphin-cmake', 'dolphin'), ('play-cmake', 'play'),
+                                    ('yabause-make', 'yabause')):
             raise ValueError('Unsupported core build recipe.')
     return lock
 
@@ -72,10 +73,17 @@ def prepare_play(repo):
 def compile_core(core, repo, work, minimum_ios):
     jobs = str(min(os.cpu_count() or 2, 8))
     with (work / (core['name'] + '-build.log')).open('w') as log:
-        def logged(args):
-            subprocess.run([str(arg) for arg in args], cwd=repo,
+        def logged(args, directory=repo):
+            subprocess.run([str(arg) for arg in args], cwd=directory,
                            stdout=log, stderr=subprocess.STDOUT, check=True)
 
+        if core.get('recipe') == 'yabause-make':
+            directory = repo / 'yabause/src/libretro'
+            logged(['make', '-f', 'Makefile', 'platform=ios-arm64',
+                    'DYNAREC=0', 'USE_PLAY_JIT=0',
+                    'MINVERSION=-miphoneos-version-min=' + minimum_ios, '-j' + jobs],
+                   directory=directory)
+            return directory / 'yabause_libretro_ios.dylib'
         if core.get('recipe') == 'dolphin-cmake':
             directory = repo / 'build/ios-arm64'
             logged(['cmake', '-S', repo, '-B', directory,
@@ -398,7 +406,7 @@ def build(root, with_armsx2=False):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--with-armsx2', action='store_true',
-                        help='Add the same-revision ARMSX2 device-test build as a seventh core')
+                        help='Add the same-revision ARMSX2 device-test build as an additional core')
     parser.add_argument('--check', action='store_true', help='Validate inputs without Xcode or downloads')
     args = parser.parse_args()
     lock = load_lock(ROOT / LAB / 'cores.lock.json')

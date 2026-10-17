@@ -44,6 +44,13 @@
       "repository": "https://github.com/libretro/beetle-saturn-libretro.git",
       "commit": "faef2779a7568c1734addc4fe63cc76e9fa2566b",
       "makefile": "Makefile"
+    },
+    {
+      "name": "yabause",
+      "system": "Sega Saturn",
+      "repository": "https://github.com/libretro/yabause.git",
+      "commit": "8926b0c6c347f8c5c755911ddb0ac695420ffbf8",
+      "recipe": "yabause-make"
     }
   ]
 }
