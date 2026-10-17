@@ -19,8 +19,16 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
 jobs:
+  lab-scope:
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/ipad-change-scope.yml
+
 
   msvc:
+    needs: lab-scope
+    if: ${{ !cancelled() && needs.lab-scope.outputs.build != 'false' }}
     runs-on: windows-2022
     timeout-minutes: 90
     strategy:

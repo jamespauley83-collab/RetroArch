@@ -1,0 +1,32 @@
+name: Scope isolated iPad changes
+on:
+  workflow_call:
+    outputs:
+      build:
+        description: Whether the cross-platform build is needed
+        value: ${{ jobs.scope.outputs.build }}
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  scope:
+    if: github.event_name == 'pull_request' && github.repository == 'jamespauley83-collab/RetroArch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      build: ${{ steps.scope.outputs.result }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Test change classification
+        run: node --test .github/scripts/pr-build-scope.test.cjs
+      - uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        id: scope
+        with:
+          script: |
+            const needsBuild = require('./.github/scripts/pr-build-scope.cjs');
+            return await needsBuild({ github, context, core }, path =>
+              path.startsWith('pkg/apple/ipad-lab/') ||
+              ['.github/workflows/ipad-lab.yml',
+               '.github/workflows/ipad-lab-armsx2.yml'].includes(path));
