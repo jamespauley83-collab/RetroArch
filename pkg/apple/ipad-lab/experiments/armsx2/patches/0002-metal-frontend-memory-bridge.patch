@@ -1,0 +1,471 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 82844c3..acda451 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -42,6 +42,13 @@ include(SearchForStuff)
+ get_git_version_info()
+ write_svnrev_h()
+ 
++if(RETROARCH_LAB_ARMSX2_BRIDGE)
++ if(NOT IOS OR NOT ENABLE_LIBRETRO)
++  message(FATAL_ERROR "The Lab bridge requires the iOS libretro target")
++ endif()
++ add_compile_definitions(RETROARCH_LAB_ARMSX2_BRIDGE=1)
++endif()
++
+ # make common
+ add_subdirectory(common)
+ 
+diff --git a/cmake/EmbedLabMetallib.cmake b/cmake/EmbedLabMetallib.cmake
+new file mode 100644
+index 0000000..4e11f8d
+--- /dev/null
++++ b/cmake/EmbedLabMetallib.cmake
+@@ -0,0 +1,3 @@
++file(READ "${INPUT}" bytes HEX)
++string(REGEX REPLACE "(..)" "0x\\1," bytes "${bytes}")
++file(WRITE "${OUTPUT}" "#pragma once\nstatic const unsigned char lab_metallib[] = {${bytes}};\n")
+diff --git a/common/Darwin/DarwinMisc.cpp b/common/Darwin/DarwinMisc.cpp
+index d73b158..6ea8e7a 100644
+--- a/common/Darwin/DarwinMisc.cpp
++++ b/common/Darwin/DarwinMisc.cpp
+@@ -1,6 +1,9 @@
+ // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
+ // SPDX-License-Identifier: GPL-3.0+
+ 
++#ifdef RETROARCH_LAB_ARMSX2_BRIDGE
++#include "common/LabFrontend.h"
++#endif
+ #include "common/Assertions.h"
+ #include "common/BitUtils.h"
+ #include "common/Console.h"
+@@ -414,6 +417,9 @@ static bool LegacyProtectCodeRange(void* address, size_t size, int prot, const c
+ 
+ void HostSys::BeginCodeWrite()
+ {
++#ifdef RETROARCH_LAB_ARMSX2_BRIDGE
++	if (LabFrontend::Code.Ready()) return;
++#endif
+ 	if ((s_code_write_depth++) == 0)
+ 	{
+ #if TARGET_OS_IPHONE
+@@ -451,6 +457,9 @@ void HostSys::BeginCodeWrite()
+ 
+ void HostSys::EndCodeWrite()
+ {
++#ifdef RETROARCH_LAB_ARMSX2_BRIDGE
++	if (LabFrontend::Code.Ready()) return;
++#endif
+ 	pxAssert(s_code_write_depth > 0);
+ 	if ((--s_code_write_depth) == 0)
+ 	{
+@@ -675,6 +684,9 @@ static bool HasTXM()
+ 
+ bool DarwinMisc::IsJITAvailable()
+ {
++#ifdef RETROARCH_LAB_ARMSX2_BRIDGE
++	return LabFrontend::Code.Ready();
++#endif
+ #if TARGET_OS_SIMULATOR
+ 	return true;
+ #elif TARGET_OS_IPHONE
+@@ -734,6 +746,9 @@ void DarwinMisc::SetJITActivityQuery(bool (*query)())
+ 
+ bool DarwinMisc::ValidateJITAlive()
+ {
++#ifdef RETROARCH_LAB_ARMSX2_BRIDGE
++	return LabFrontend::Code.Ready();
++#endif
+ #if TARGET_OS_IPHONE && !TARGET_OS_SIMULATOR
+ 	// Check 1: CS_DEBUGGED still set?
+ 	u32 cs_flags = 0;
+@@ -902,6 +917,15 @@ static void JIT26Detach(void)
+ 
+ void* DarwinMisc::MmapCodeDualMap(size_t size)
+ {
++#ifdef RETROARCH_LAB_ARMSX2_BRIDGE
++	std::lock_guard<std::mutex> validation_lock(s_jit_validation_mutex);
++	void* rx = LabFrontend::Code.RX(size);
++	if (!rx) return nullptr;
++	g_code_rw_offset = LabFrontend::Code.Offset();
++	g_code_rw_base = reinterpret_cast<uintptr_t>(LabFrontend::Code.RW());
++	g_code_rw_size = size;
++	return rx;
++#else
+ #if !TARGET_OS_IPHONE || TARGET_OS_SIMULATOR
+ 	// [jit-transplant] CI-only test hook: ARMSX2_FORCE_DUAL_MAP=1 on macOS
+ 	// builds the iOS-style vm_remap RW alias (g_code_rw_offset != 0) instead
+@@ -1199,6 +1223,7 @@ void* DarwinMisc::MmapCodeDualMap(size_t size)
+ 		sigaction(SIGTRAP, &sa_brk_old, nullptr);
+ 	return rx_ptr;
+ #endif
++#endif // RETROARCH_LAB_ARMSX2_BRIDGE
+ }
+ 
+ void DarwinMisc::MunmapCodeDualMap(void* rx_ptr, size_t size)
+@@ -1212,6 +1237,11 @@ void DarwinMisc::MunmapCodeDualMap(void* rx_ptr, size_t size)
+ 	g_code_rw_offset = 0;
+ 	g_code_rw_base = 0;
+ 	g_code_rw_size = 0;
++#ifdef RETROARCH_LAB_ARMSX2_BRIDGE
++	// The frontend thread releases its arena after CPU/GS shutdown.
++	(void)rw_base; (void)rw_size; (void)rw_offset; (void)rx_ptr; (void)size;
++	return;
++#endif
+ 	if (rw_base && rw_offset != 0)
+ 		vm_deallocate(mach_task_self(), static_cast<vm_address_t>(rw_base), static_cast<vm_size_t>(rw_size));
+ 	if (rx_ptr)
+diff --git a/common/LabFrontend.h b/common/LabFrontend.h
+new file mode 100644
+index 0000000..b4276f3
+--- /dev/null
++++ b/common/LabFrontend.h
+@@ -0,0 +1,121 @@
++#pragma once
++
++#include <cstddef>
++#include <cstdint>
++#include <limits>
++#include <mutex>
++#include <utility>
++#include <vector>
++
++namespace LabFrontend
++{
++// RetroArch executable-memory ABI v1. No WX-toggle: EE/VU writes can overlap.
++using Environment = bool (*)(unsigned, void*);
++struct Allocation
++{
++	unsigned version;
++	size_t size;
++	unsigned mode;
++	void* rx;
++	void* rw;
++};
++struct ReleaseRequest { void* rx; };
++class CodeArena
++{
++public:
++	bool Prepare(Environment environment, size_t size)
++	{
++		if (m_allocation.rx) return size <= m_allocation.size;
++		if (!environment || !size) return false;
++		Allocation probe{1, 0, 0, nullptr, nullptr};
++		if (!environment(83, &probe) || (probe.mode != 2 && probe.mode != 4) ||
++			(probe.size && probe.size < size)) return false;
++		Allocation allocation{1, size, 0, nullptr, nullptr};
++		const bool allocated = environment(83, &allocation);
++		const uintptr_t rx = reinterpret_cast<uintptr_t>(allocation.rx);
++		const uintptr_t rw = reinterpret_cast<uintptr_t>(allocation.rw);
++		const uintptr_t distance = rx > rw ? rx - rw : rw - rx;
++		if (!allocated || !rx || !rw || allocation.size < size ||
++			(allocation.mode != 2 && allocation.mode != 4) ||
++			(allocation.mode == 2 && rx != rw) ||
++			(allocation.mode == 4 && rx == rw) ||
++			(rx % 16384) || (rw % 16384) ||
++			distance > static_cast<uintptr_t>(std::numeric_limits<ptrdiff_t>::max()))
++		{
++			if (allocation.rx) { ReleaseRequest release{allocation.rx}; environment(84, &release); }
++			return false;
++		}
++		m_environment = environment;
++		m_allocation = allocation;
++		return true;
++	}
++	void Release()
++	{
++		if (!m_allocation.rx) return;
++		ReleaseRequest release{m_allocation.rx};
++		m_environment(84, &release);
++		m_allocation = {};
++		m_environment = nullptr;
++	}
++	void* RX(size_t size) const { return size <= m_allocation.size ? m_allocation.rx : nullptr; }
++	void* WritableForRX(void* address, size_t size) const
++	{
++		const uintptr_t base = reinterpret_cast<uintptr_t>(m_allocation.rx);
++		const uintptr_t pointer = reinterpret_cast<uintptr_t>(address);
++		if (!base || pointer < base || pointer - base > m_allocation.size ||
++			size > m_allocation.size - (pointer - base)) return nullptr;
++		return static_cast<unsigned char*>(m_allocation.rw) + (pointer - base);
++	}
++	void* RW() const { return m_allocation.rw; }
++	bool Ready() const { return m_allocation.rx != nullptr; }
++	ptrdiff_t Offset() const
++	{
++		const uintptr_t rx = reinterpret_cast<uintptr_t>(m_allocation.rx);
++		const uintptr_t rw = reinterpret_cast<uintptr_t>(m_allocation.rw);
++		return rw >= rx ? static_cast<ptrdiff_t>(rw - rx) : -static_cast<ptrdiff_t>(rx - rw);
++	}
++private:
++	Environment m_environment = nullptr;
++	Allocation m_allocation{};
++};
++inline CodeArena Code;
++
++struct Frame
++{
++	unsigned width = 0, height = 0;
++	std::vector<uint32_t> pixels;
++};
++// One latest frame, so an open frontend menu cannot grow a queue or block MTGS.
++class FrameMailbox
++{
++public:
++	bool Publish(Frame frame)
++	{
++		if (!frame.width || !frame.height || frame.width > 640 || frame.height > 448 ||
++			frame.pixels.size() != static_cast<size_t>(frame.width) * frame.height) return false;
++		// Metal download is RGBA8; libretro XRGB8888 is 0x00RRGGBB.
++		for (auto& pixel : frame.pixels)
++			pixel = ((pixel & 0xff) << 16) | (pixel & 0xff00) | ((pixel >> 16) & 0xff);
++		std::lock_guard<std::mutex> lock(m_mutex);
++		m_frame = std::move(frame);
++		return true;
++	}
++	bool Consume(Frame& frame)
++	{
++		std::lock_guard<std::mutex> lock(m_mutex);
++		if (m_frame.pixels.empty()) return false;
++		frame = std::move(m_frame);
++		m_frame = {};
++		return true;
++	}
++	void Clear()
++	{
++		std::lock_guard<std::mutex> lock(m_mutex);
++		m_frame = {};
++	}
++private:
++	std::mutex m_mutex;
++	Frame m_frame;
++};
++inline FrameMailbox Frames;
++}
+diff --git a/common/Linux/LnxHostSys.cpp b/common/Linux/LnxHostSys.cpp
+index 6e3e240..5e61f59 100644
+--- a/common/Linux/LnxHostSys.cpp
++++ b/common/Linux/LnxHostSys.cpp
+@@ -1,6 +1,9 @@
+ // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
+ // SPDX-License-Identifier: GPL-3.0+
+ 
++#ifdef RETROARCH_LAB_ARMSX2_BRIDGE
++#include "common/LabFrontend.h"
++#endif
+ #include "common/Assertions.h"
+ #include "common/BitUtils.h"
+ #include "common/Console.h"
+@@ -352,6 +355,10 @@ bool SharedMemoryMappingArea::Unmap(void* map_base, size_t map_size, bool is_fil
+ void HostSys::FlushInstructionCache(void* address, u32 size)
+ {
+ #ifdef __APPLE__
++#ifdef RETROARCH_LAB_ARMSX2_BRIDGE
++	if (void* writable = LabFrontend::Code.WritableForRX(address, size))
++		sys_dcache_flush(writable, size);
++#endif
+ 	sys_icache_invalidate(address, size);
+ #else
+ 	__builtin___clear_cache(reinterpret_cast<char*>(address), reinterpret_cast<char*>(address) + size);
+diff --git a/pcsx2-libretro/CMakeLists.txt b/pcsx2-libretro/CMakeLists.txt
+index e6ef8fe..4f1f391 100644
+--- a/pcsx2-libretro/CMakeLists.txt
++++ b/pcsx2-libretro/CMakeLists.txt
+@@ -52,3 +52,33 @@ endif()
+ if(APPLE)
+     target_link_options(pcsx2-libretro PRIVATE "LINKER:-exported_symbol,_retro_*")
+ endif()
++
++if(RETROARCH_LAB_ARMSX2_BRIDGE)
++ get_property(lab_shaders GLOBAL PROPERTY PCSX2_METAL_SHADERS)
++ set(lab_air_files)
++ foreach(shader IN LISTS lab_shaders)
++  get_filename_component(name "${shader}" NAME_WE)
++  set(air "${CMAKE_CURRENT_BINARY_DIR}/lab-metal/${name}.air")
++  add_custom_command(OUTPUT "${air}"
++   COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/lab-metal"
++   COMMAND xcrun -sdk iphoneos metal -std=ios-metal2.3 -mios-version-min=26.0
++    -ffast-math -c "${CMAKE_SOURCE_DIR}/pcsx2/${shader}" -o "${air}"
++   DEPENDS "${CMAKE_SOURCE_DIR}/pcsx2/${shader}"
++    "${CMAKE_SOURCE_DIR}/pcsx2/GS/Renderers/Metal/GSMTLShaderCommon.h"
++    "${CMAKE_SOURCE_DIR}/pcsx2/GS/Renderers/Metal/GSMTLSharedHeader.h"
++   VERBATIM)
++  list(APPEND lab_air_files "${air}")
++ endforeach()
++ set(lab_metallib "${CMAKE_CURRENT_BINARY_DIR}/lab-metal/armsx2.metallib")
++ set(lab_header "${CMAKE_CURRENT_BINARY_DIR}/lab-metal/LabMetallib.h")
++ add_custom_command(OUTPUT "${lab_metallib}"
++  COMMAND xcrun -sdk iphoneos metallib ${lab_air_files} -o "${lab_metallib}"
++  DEPENDS ${lab_air_files} VERBATIM)
++ add_custom_command(OUTPUT "${lab_header}"
++  COMMAND ${CMAKE_COMMAND} "-DINPUT=${lab_metallib}" "-DOUTPUT=${lab_header}"
++   -P "${CMAKE_SOURCE_DIR}/cmake/EmbedLabMetallib.cmake"
++  DEPENDS "${lab_metallib}" "${CMAKE_SOURCE_DIR}/cmake/EmbedLabMetallib.cmake" VERBATIM)
++ add_custom_target(lab-metal DEPENDS "${lab_header}")
++ add_dependencies(PCSX2 lab-metal)
++ target_include_directories(PCSX2 PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/lab-metal")
++endif()
+diff --git a/pcsx2-libretro/Main.cpp b/pcsx2-libretro/Main.cpp
+index 93a1710..94ad295 100644
+--- a/pcsx2-libretro/Main.cpp
++++ b/pcsx2-libretro/Main.cpp
+@@ -17,6 +17,9 @@
+ //      audio batching, libretro input -> Pad, core options -> settings.
+ //  M4: save states over retro_serialize, disk control, memcard-per-content.
+ 
++#ifdef RETROARCH_LAB_ARMSX2_BRIDGE
++#include "common/LabFrontend.h"
++#endif
+ #include <algorithm>
+ #include <atomic>
+ #include <cmath>
+@@ -1824,6 +1827,20 @@ RETRO_API bool retro_load_game(const struct retro_game_info* game)
+ 
+ 	s_shutdown_requested.store(false, std::memory_order_release);
+ 
++#ifdef RETROARCH_LAB_ARMSX2_BRIDGE
++	{
++		auto lock = Host::GetSettingsLock();
++		s_base_settings->SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(GSRendererType::Metal));
++		VMManager::Internal::LoadStartupSettings();
++	}
++	if (!LabFrontend::Code.Prepare(environ_cb, HostMemoryMap::CodeSize))
++	{
++		retro_message message{"ARMSX2 requires iOS 26+ with JIT enabled and a 305 MiB RWX/dual-map arena; WX-toggle is unsupported.", 300};
++		environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &message);
++		return false;
++	}
++	LabFrontend::Frames.Clear();
++#else
+ 	// Which hardware context to ask for.
+ 	//
+ 	// Neither API is guaranteed to be there. A frontend can be built without
+@@ -2069,6 +2086,8 @@ RETRO_API bool retro_load_game(const struct retro_game_info* game)
+ 		VMManager::Internal::LoadStartupSettings();
+ 	}
+ 
++#endif // RETROARCH_LAB_ARMSX2_BRIDGE
++
+ 	SysMemory::ReserveMemory();
+ 
+ 	LibretroCore::s_cpu_thread = std::thread([params = std::move(params)]() mutable {
+@@ -2112,6 +2131,10 @@ RETRO_API void retro_unload_game(void)
+ 	if (LibretroCore::s_cpu_thread.joinable())
+ 		LibretroCore::s_cpu_thread.join();
+ 
++#ifdef RETROARCH_LAB_ARMSX2_BRIDGE
++	LabFrontend::Frames.Clear();
++	LabFrontend::Code.Release();
++#endif
+ 	s_base_settings.reset();
+ 	s_secrets_settings.reset();
+ 	LibretroCore::s_content_path.clear();
+@@ -2305,9 +2328,17 @@ RETRO_API void retro_run(void)
+ 	}
+ 	else
+ 	{
++#ifdef RETROARCH_LAB_ARMSX2_BRIDGE
++		LabFrontend::Frame frame;
++		if (LabFrontend::Frames.Consume(frame))
++			video_cb(frame.pixels.data(), frame.width, frame.height, frame.width * sizeof(u32));
++		else
++			video_cb(nullptr, LibretroCore::kFrameWidth, LibretroCore::kFrameHeight, 0);
++#else
+ 		// Null-GS fallback: placeholder software frame.
+ 		video_cb(LibretroCore::s_frame_buffer.data(), LibretroCore::kFrameWidth,
+ 			LibretroCore::kFrameHeight, LibretroCore::kFrameWidth * sizeof(u32));
++#endif
+ 	}
+ 
+ 	// PAL/NTSC: retro_get_system_av_info runs before the VM boots, so the
+diff --git a/pcsx2/GS/Renderers/Common/GSRenderer.cpp b/pcsx2/GS/Renderers/Common/GSRenderer.cpp
+index 865eb72..236b357 100644
+--- a/pcsx2/GS/Renderers/Common/GSRenderer.cpp
++++ b/pcsx2/GS/Renderers/Common/GSRenderer.cpp
+@@ -1,6 +1,9 @@
+ // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
+ // SPDX-License-Identifier: GPL-3.0+
+ 
++#ifdef RETROARCH_LAB_ARMSX2_BRIDGE
++#include "common/LabFrontend.h"
++#endif
+ #include "ImGui/FullscreenUI.h"
+ #include "ImGui/ImGuiManager.h"
+ #include "GS/Renderers/Common/GSRenderer.h"
+@@ -1260,6 +1263,21 @@ void GSRenderer::VSync(u32 field, bool registers_written, bool idle_frame)
+ 			}
+ 		}
+ 
++#ifdef RETROARCH_LAB_ARMSX2_BRIDGE
++		LabFrontend::Frame frame;
++		if (current && !blank_frame)
++		{
++			if (SaveSnapshotToMemory(640, 448, true, false, &frame.width, &frame.height, &frame.pixels))
++				LabFrontend::Frames.Publish(std::move(frame));
++		}
++		else
++		{
++			frame.width = 640;
++			frame.height = 448;
++			frame.pixels.resize(640 * 448, 0);
++			LabFrontend::Frames.Publish(std::move(frame));
++		}
++#endif
+ 		if (BeginPresentFrame(false))
+ 		{
+ 			if (current && !blank_frame)
+diff --git a/pcsx2/GS/Renderers/Metal/GSDeviceMTL.mm b/pcsx2/GS/Renderers/Metal/GSDeviceMTL.mm
+index 23c13cc..94394be 100644
+--- a/pcsx2/GS/Renderers/Metal/GSDeviceMTL.mm
++++ b/pcsx2/GS/Renderers/Metal/GSDeviceMTL.mm
+@@ -1355,6 +1355,10 @@ bool GSDeviceMTL::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
+ 	}
+ 
+ 	MTLPixelFormat layer_px_fmt = [m_layer pixelFormat];
++#ifdef RETROARCH_LAB_ARMSX2_BRIDGE
++	if (!m_layer)
++		layer_px_fmt = MTLPixelFormatBGRA8Unorm;
++#endif
+ 
+ 	m_features.broken_point_sampler = false;
+ 	m_features.vs_expand = !GSConfig.DisableVertexShaderExpand;
+diff --git a/pcsx2/GS/Renderers/Metal/GSMTLDeviceInfo.mm b/pcsx2/GS/Renderers/Metal/GSMTLDeviceInfo.mm
+index 6fd2f0a..36bab9c 100644
+--- a/pcsx2/GS/Renderers/Metal/GSMTLDeviceInfo.mm
++++ b/pcsx2/GS/Renderers/Metal/GSMTLDeviceInfo.mm
+@@ -2,6 +2,10 @@
+ // SPDX-License-Identifier: GPL-3.0+
+ 
+ #include "GSMTLDeviceInfo.h"
++#ifdef RETROARCH_LAB_ARMSX2_BRIDGE
++#include "LabMetallib.h"
++#include <dispatch/dispatch.h>
++#endif
+ #include "GS/GS.h"
+ #include "common/Console.h"
+ #include "common/Path.h"
+@@ -23,6 +27,16 @@ static id<MTLLibrary> loadMainLibrary(id<MTLDevice> dev, NSString* name)
+ 
+ static MRCOwned<id<MTLLibrary>> loadMainLibrary(id<MTLDevice> dev)
+ {
++#ifdef RETROARCH_LAB_ARMSX2_BRIDGE
++	dispatch_data_t data = dispatch_data_create(lab_metallib, sizeof(lab_metallib),
++		dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), DISPATCH_DATA_DESTRUCTOR_DEFAULT);
++	NSError* error = nil;
++	id<MTLLibrary> library = [dev newLibraryWithData:data error:&error];
++	dispatch_release(data);
++	if (!library)
++		Console.Error("Lab Metal library: %s", [[error localizedDescription] UTF8String]);
++	return MRCTransfer(library);
++#else
+ 	if (@available(macOS 11.0, iOS 14.0, *))
+ 		if (id<MTLLibrary> lib = loadMainLibrary(dev, @"Metal23"))
+ 			return MRCTransfer(lib);
+@@ -35,6 +49,7 @@ static MRCOwned<id<MTLLibrary>> loadMainLibrary(id<MTLDevice> dev)
+ 	if (id<MTLLibrary> lib = loadMainLibrary(dev, @"default"))
+ 		return MRCTransfer(lib);
+ 	return MRCTransfer([dev newDefaultLibrary]);
++#endif
+ }
+ 
+ static GSMTLDevice::MetalVersion detectLibraryVersion(id<MTLLibrary> lib)

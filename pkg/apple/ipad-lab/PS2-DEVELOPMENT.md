@@ -26,7 +26,8 @@ jobs non-blocking during reconciliation; verify a specific revision's job
 results before using it. Comments in `pcsx2-libretro/Main.cpp` describe early
 milestones even though later implementation exists, so audit the code itself.
 
-The next alternate-core milestone is a reproducible ARMSX2 iOS libretro build
+The isolated [ARMSX2 build probe](experiments/armsx2/README.md) now tracks
+the first alternate-core milestone: a reproducible ARMSX2 iOS libretro build
 in an isolated experiment. Verify exported `retro_*` symbols, ARM64/iOS load
 commands and dependencies before packaging. Exercise iOS JIT allocation and
 code writes under Lab's actual executable-memory model. Keep graphics and

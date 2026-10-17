@@ -1,0 +1,147 @@
+diff --git a/pcsx2-libretro/CMakeLists.txt b/pcsx2-libretro/CMakeLists.txt
+index 4f1f391..fe0772e 100644
+--- a/pcsx2-libretro/CMakeLists.txt
++++ b/pcsx2-libretro/CMakeLists.txt
+@@ -46,6 +46,12 @@ endif()
+ add_custom_target(armsx2_libretro)
+ add_dependencies(armsx2_libretro pcsx2-libretro)
+ 
++if(RETROARCH_LAB_ARMSX2_DEVICE_TEST)
++    if(RETROARCH_LAB_ARMSX2_BUILD_PROBE OR NOT RETROARCH_LAB_ARMSX2_BRIDGE)
++        message(FATAL_ERROR "Device testing requires the bridge and must not enable the build-probe gate")
++    endif()
++    target_compile_definitions(pcsx2-libretro PRIVATE RETROARCH_LAB_ARMSX2_DEVICE_TEST=1)
++endif()
+ if(RETROARCH_LAB_ARMSX2_BUILD_PROBE)
+     target_compile_definitions(pcsx2-libretro PRIVATE RETROARCH_LAB_ARMSX2_BUILD_PROBE=1)
+ endif()
+diff --git a/pcsx2-libretro/Main.cpp b/pcsx2-libretro/Main.cpp
+index 94ad295..b0c6b75 100644
+--- a/pcsx2-libretro/Main.cpp
++++ b/pcsx2-libretro/Main.cpp
+@@ -69,6 +69,9 @@
+ #include "common/StringUtil.h"
+ #include "common/Threading.h"
+ #include "common/HostVFS.h"
++#ifdef RETROARCH_LAB_ARMSX2_DEVICE_TEST
++#include "common/HostSys.h"
++#endif
+ 
+ #include "pcsx2/PrecompiledHeader.h"
+ 
+@@ -150,6 +153,10 @@ static std::unique_ptr<INISettingsInterface> s_base_settings;
+ static std::unique_ptr<INISettingsInterface> s_secrets_settings;
+ 
+ static std::atomic<bool> s_shutdown_requested{false};
++#ifdef RETROARCH_LAB_ARMSX2_DEVICE_TEST
++static std::atomic<bool> s_boot_failed{false};
++static std::string s_boot_error;
++#endif
+ 
+ // Pending CPU-thread callbacks queued by Host::RunOnCPUThread (same
+ // mechanism as the SDL frontend; drained by Host::PumpMessagesOnCPUThread
+@@ -681,6 +688,10 @@ void LibretroCore::CPUThreadMain(VMBootParameters initial_params)
+ 	if (!VMManager::Internal::CPUThreadInitialize())
+ 	{
+ 		Console.Error("CPU thread init failed.");
++#ifdef RETROARCH_LAB_ARMSX2_DEVICE_TEST
++		s_boot_error = "ARMSX2 CPU/memory initialization failed. See the core log.";
++		s_boot_failed.store(true, std::memory_order_release);
++#endif
+ 		VMManager::Internal::CPUThreadShutdown();
+ 		s_vm_thread_running.store(false, std::memory_order_release);
+ 		s_cpu_thread_initialized.store(true, std::memory_order_release); // unblock load_game
+@@ -741,6 +752,10 @@ void LibretroCore::CPUThreadMain(VMBootParameters initial_params)
+ 					{
+ 						Console.ErrorFmt("VMManager::Initialize failed (result {}): {}",
+ 							static_cast<int>(br), boot_error.GetDescription());
++#ifdef RETROARCH_LAB_ARMSX2_DEVICE_TEST
++						s_boot_error = "ARMSX2 boot failed: " + boot_error.GetDescription();
++						s_boot_failed.store(true, std::memory_order_release);
++#endif
+ 						s_shutdown_requested.store(true, std::memory_order_release);
+ 						break;
+ 					}
+@@ -1656,7 +1671,11 @@ RETRO_API void retro_set_environment(retro_environment_t cb)
+ 	else
+ 		log_cb = FallbackLog;
+ 
++#ifdef RETROARCH_LAB_ARMSX2_DEVICE_TEST
++	bool support_no_game = true;
++#else
+ 	bool support_no_game = false;
++#endif
+ 	cb(RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME, &support_no_game);
+ 
+ 	InstallFrontendVFS(cb);
+@@ -1823,7 +1842,7 @@ RETRO_API bool retro_load_game(const struct retro_game_info* game)
+ 	{
+ 		params.source_type = CDVD_SourceType::NoDisc;
+ 	}
+-	params.fast_boot = true;
++	params.fast_boot = game && game->path;
+ 
+ 	s_shutdown_requested.store(false, std::memory_order_release);
+ 
+@@ -1839,6 +1858,28 @@ RETRO_API bool retro_load_game(const struct retro_game_info* game)
+ 		environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &message);
+ 		return false;
+ 	}
++#ifdef RETROARCH_LAB_ARMSX2_DEVICE_TEST
++	// Execute through RX, then patch through RW and verify instruction-cache visibility.
++	const uint32_t instructions[] = {0x52800540, 0xd65f03c0}; // mov w0,#42; ret
++	void* executable = LabFrontend::Code.RX(sizeof(instructions));
++	std::memcpy(LabFrontend::Code.RW(), instructions, sizeof(instructions));
++	HostSys::FlushInstructionCache(executable, sizeof(instructions));
++	const auto probe = reinterpret_cast<unsigned (*)()>(executable);
++	const unsigned first = probe();
++	const uint32_t patched = 0x52800560; // mov w0,#43
++	std::memcpy(LabFrontend::Code.RW(), &patched, sizeof(patched));
++	HostSys::FlushInstructionCache(executable, sizeof(instructions));
++	if (first != 42 || probe() != 43)
++	{
++		retro_message message{"ARMSX2 JIT execution/cache test failed; emulator not started.", 600};
++		environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &message);
++		LabFrontend::Code.Release();
++		return false;
++	}
++	log_cb(RETRO_LOG_INFO, "ARMSX2 Lab device test: experimental boot; JIT execute/patch test passed.\n");
++	s_boot_error.clear();
++	s_boot_failed.store(false, std::memory_order_release);
++#endif
+ 	LabFrontend::Frames.Clear();
+ #else
+ 	// Which hardware context to ask for.
+@@ -2155,6 +2196,15 @@ RETRO_API void retro_unload_game(void)
+ 
+ RETRO_API void retro_run(void)
+ {
++#ifdef RETROARCH_LAB_ARMSX2_DEVICE_TEST
++	if (s_boot_failed.load(std::memory_order_acquire))
++	{
++		retro_message message{s_boot_error.c_str(), 600};
++		environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &message);
++		environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, nullptr);
++		return;
++	}
++#endif
+ 	input_poll_cb();
+ 
+ 	bool options_updated = false;
+diff --git a/pcsx2/GS/Renderers/Metal/GSDeviceMTL.mm b/pcsx2/GS/Renderers/Metal/GSDeviceMTL.mm
+index 94394be..49ca885 100644
+--- a/pcsx2/GS/Renderers/Metal/GSDeviceMTL.mm
++++ b/pcsx2/GS/Renderers/Metal/GSDeviceMTL.mm
+@@ -1338,10 +1338,8 @@ bool GSDeviceMTL::Create(GSVSyncMode vsync_mode, bool allow_present_throttle)
+ 		if (!AcquireWindow(true))
+ 			return false;
+ 
+-		OnMainThread([this]
+-		{
+-			AttachSurfaceOnMainThread();
+-		});
++		if (m_window_info.type != WindowInfo::Type::Surfaceless)
++			OnMainThread([this] { AttachSurfaceOnMainThread(); });
+ 
+ 		// Metal does not support mailbox.
+ 		m_vsync_mode = (m_vsync_mode == GSVSyncMode::Mailbox) ? GSVSyncMode::FIFO : m_vsync_mode;

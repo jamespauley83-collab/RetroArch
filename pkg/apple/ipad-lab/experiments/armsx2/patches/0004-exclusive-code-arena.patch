@@ -1,0 +1,160 @@
+diff --git a/common/Darwin/DarwinMisc.cpp b/common/Darwin/DarwinMisc.cpp
+index 6ea8e7a..238a33d 100644
+--- a/common/Darwin/DarwinMisc.cpp
++++ b/common/Darwin/DarwinMisc.cpp
+@@ -919,8 +919,12 @@ void* DarwinMisc::MmapCodeDualMap(size_t size)
+ {
+ #ifdef RETROARCH_LAB_ARMSX2_BRIDGE
+ 	std::lock_guard<std::mutex> validation_lock(s_jit_validation_mutex);
+-	void* rx = LabFrontend::Code.RX(size);
+-	if (!rx) return nullptr;
++	void* rx = LabFrontend::Code.AcquireRX(size);
++	if (!rx)
++	{
++		std::fprintf(stderr, "ARMSX2 Lab JIT arena unavailable, already assigned, or invalid size: %zu\n", size);
++		return nullptr;
++	}
+ 	g_code_rw_offset = LabFrontend::Code.Offset();
+ 	g_code_rw_base = reinterpret_cast<uintptr_t>(LabFrontend::Code.RW());
+ 	g_code_rw_size = size;
+@@ -1231,17 +1235,23 @@ void DarwinMisc::MunmapCodeDualMap(void* rx_ptr, size_t size)
+ 	// Wait for any already-running idle validation before invalidating either
+ 	// the RW alias or executable mapping.
+ 	std::lock_guard<std::mutex> validation_lock(s_jit_validation_mutex);
++#ifdef RETROARCH_LAB_ARMSX2_BRIDGE
++	if (!LabFrontend::Code.ReturnRX(rx_ptr, size))
++	{
++		std::fprintf(stderr, "ARMSX2 Lab JIT arena rejected unmatched unmap: %p size=%zu\n", rx_ptr, size);
++		return;
++	}
++	g_code_rw_offset = 0;
++	g_code_rw_base = 0;
++	g_code_rw_size = 0;
++	// The frontend thread releases its arena after CPU/GS shutdown.
++#else
+ 	const uintptr_t rw_base = g_code_rw_base;
+ 	const size_t rw_size = g_code_rw_size;
+ 	const ptrdiff_t rw_offset = g_code_rw_offset;
+ 	g_code_rw_offset = 0;
+ 	g_code_rw_base = 0;
+ 	g_code_rw_size = 0;
+-#ifdef RETROARCH_LAB_ARMSX2_BRIDGE
+-	// The frontend thread releases its arena after CPU/GS shutdown.
+-	(void)rw_base; (void)rw_size; (void)rw_offset; (void)rx_ptr; (void)size;
+-	return;
+-#endif
+ 	if (rw_base && rw_offset != 0)
+ 		vm_deallocate(mach_task_self(), static_cast<vm_address_t>(rw_base), static_cast<vm_size_t>(rw_size));
+ 	if (rx_ptr)
+@@ -1252,6 +1262,7 @@ void DarwinMisc::MunmapCodeDualMap(void* rx_ptr, size_t size)
+ 	s_legacy_is_writable = true;
+ 	s_legacy_range_log_done = false;
+ #endif
++#endif // RETROARCH_LAB_ARMSX2_BRIDGE
+ }
+ 
+ void DarwinMisc::LegacyEnsureExecutable()
+diff --git a/common/LabFrontend.h b/common/LabFrontend.h
+index b4276f3..eef5caa 100644
+--- a/common/LabFrontend.h
++++ b/common/LabFrontend.h
+@@ -23,6 +23,9 @@ struct ReleaseRequest { void* rx; };
+ class CodeArena
+ {
+ public:
++	CodeArena() = default;
++	CodeArena(const CodeArena&) = delete;
++	CodeArena& operator=(const CodeArena&) = delete;
+ 	bool Prepare(Environment environment, size_t size)
+ 	{
+ 		if (m_allocation.rx) return size <= m_allocation.size;
+@@ -49,21 +52,35 @@ public:
+ 		m_allocation = allocation;
+ 		return true;
+ 	}
+-	void Release()
++	bool Release()
+ 	{
+-		if (!m_allocation.rx) return;
++		if (m_borrowed_size) return false;
++		if (!m_allocation.rx) return true;
+ 		ReleaseRequest release{m_allocation.rx};
+-		m_environment(84, &release);
++		if (!m_environment(84, &release)) return false;
+ 		m_allocation = {};
+ 		m_environment = nullptr;
++		return true;
++	}
++	// Darwin serializes VM borrows; frontend setup/teardown runs outside the VM lifetime.
++	void* AcquireRX(size_t size)
++	{
++		if (!m_allocation.rx || !size || size > m_allocation.size || m_borrowed_size) return nullptr;
++		m_borrowed_size = size;
++		return m_allocation.rx;
++	}
++	bool ReturnRX(void* address, size_t size)
++	{
++		if (!m_borrowed_size || address != m_allocation.rx || size != m_borrowed_size) return false;
++		m_borrowed_size = 0;
++		return true;
+ 	}
+-	void* RX(size_t size) const { return size <= m_allocation.size ? m_allocation.rx : nullptr; }
+ 	void* WritableForRX(void* address, size_t size) const
+ 	{
+ 		const uintptr_t base = reinterpret_cast<uintptr_t>(m_allocation.rx);
+ 		const uintptr_t pointer = reinterpret_cast<uintptr_t>(address);
+-		if (!base || pointer < base || pointer - base > m_allocation.size ||
+-			size > m_allocation.size - (pointer - base)) return nullptr;
++		if (!base || pointer < base || pointer - base >= m_borrowed_size ||
++			size > m_borrowed_size - (pointer - base)) return nullptr;
+ 		return static_cast<unsigned char*>(m_allocation.rw) + (pointer - base);
+ 	}
+ 	void* RW() const { return m_allocation.rw; }
+@@ -77,6 +94,7 @@ public:
+ private:
+ 	Environment m_environment = nullptr;
+ 	Allocation m_allocation{};
++	size_t m_borrowed_size = 0;
+ };
+ inline CodeArena Code;
+ 
+diff --git a/pcsx2-libretro/Main.cpp b/pcsx2-libretro/Main.cpp
+index b0c6b75..ef644bb 100644
+--- a/pcsx2-libretro/Main.cpp
++++ b/pcsx2-libretro/Main.cpp
+@@ -1861,7 +1861,13 @@ RETRO_API bool retro_load_game(const struct retro_game_info* game)
+ #ifdef RETROARCH_LAB_ARMSX2_DEVICE_TEST
+ 	// Execute through RX, then patch through RW and verify instruction-cache visibility.
+ 	const uint32_t instructions[] = {0x52800540, 0xd65f03c0}; // mov w0,#42; ret
+-	void* executable = LabFrontend::Code.RX(sizeof(instructions));
++	void* executable = LabFrontend::Code.AcquireRX(sizeof(instructions));
++	if (!executable)
++	{
++		retro_message message{"ARMSX2 JIT arena is already assigned; emulator not started.", 600};
++		environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &message);
++		return false;
++	}
+ 	std::memcpy(LabFrontend::Code.RW(), instructions, sizeof(instructions));
+ 	HostSys::FlushInstructionCache(executable, sizeof(instructions));
+ 	const auto probe = reinterpret_cast<unsigned (*)()>(executable);
+@@ -1869,7 +1875,9 @@ RETRO_API bool retro_load_game(const struct retro_game_info* game)
+ 	const uint32_t patched = 0x52800560; // mov w0,#43
+ 	std::memcpy(LabFrontend::Code.RW(), &patched, sizeof(patched));
+ 	HostSys::FlushInstructionCache(executable, sizeof(instructions));
+-	if (first != 42 || probe() != 43)
++	const unsigned second = probe();
++	LabFrontend::Code.ReturnRX(executable, sizeof(instructions));
++	if (first != 42 || second != 43)
+ 	{
+ 		retro_message message{"ARMSX2 JIT execution/cache test failed; emulator not started.", 600};
+ 		environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &message);
+@@ -2174,7 +2182,8 @@ RETRO_API void retro_unload_game(void)
+ 
+ #ifdef RETROARCH_LAB_ARMSX2_BRIDGE
+ 	LabFrontend::Frames.Clear();
+-	LabFrontend::Code.Release();
++	if (!LabFrontend::Code.Release())
++		log_cb(RETRO_LOG_ERROR, "ARMSX2 JIT arena still owned or frontend release failed; memory retained.\n");
+ #endif
+ 	s_base_settings.reset();
+ 	s_secrets_settings.reset();

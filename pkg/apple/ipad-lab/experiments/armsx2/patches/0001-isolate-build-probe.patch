@@ -1,0 +1,59 @@
+diff --git a/pcsx2-libretro/CMakeLists.txt b/pcsx2-libretro/CMakeLists.txt
+index 443dbfb..e6ef8fe 100644
+--- a/pcsx2-libretro/CMakeLists.txt
++++ b/pcsx2-libretro/CMakeLists.txt
+@@ -45,3 +45,10 @@ endif()
+ # <CORENAME>_libretro (see .gitlab-ci.yml).
+ add_custom_target(armsx2_libretro)
+ add_dependencies(armsx2_libretro pcsx2-libretro)
++
++if(RETROARCH_LAB_ARMSX2_BUILD_PROBE)
++    target_compile_definitions(pcsx2-libretro PRIVATE RETROARCH_LAB_ARMSX2_BUILD_PROBE=1)
++endif()
++if(APPLE)
++    target_link_options(pcsx2-libretro PRIVATE "LINKER:-exported_symbol,_retro_*")
++endif()
+diff --git a/pcsx2-libretro/LabPrototypeGate.h b/pcsx2-libretro/LabPrototypeGate.h
+new file mode 100644
+index 0000000..57101cb
+--- /dev/null
++++ b/pcsx2-libretro/LabPrototypeGate.h
+@@ -0,0 +1,14 @@
++#pragma once
++#include "libretro.h"
++
++inline bool LabPrototypeCanLoad(retro_environment_t environment, retro_log_printf_t log)
++{
++    const char* message = "ARMSX2 Lab build probe: gameplay disabled until graphics and JIT integration are validated.";
++    if(log) log(RETRO_LOG_ERROR, "%s\n", message);
++    if(environment)
++    {
++        retro_message notification = {message, 300};
++        environment(RETRO_ENVIRONMENT_SET_MESSAGE, &notification);
++    }
++    return false;
++}
+diff --git a/pcsx2-libretro/Main.cpp b/pcsx2-libretro/Main.cpp
+index 201a874..93a1710 100644
+--- a/pcsx2-libretro/Main.cpp
++++ b/pcsx2-libretro/Main.cpp
+@@ -35,6 +35,9 @@
+ #include <vector>
+ 
+ #include "libretro.h"
++#ifdef RETROARCH_LAB_ARMSX2_BUILD_PROBE
++#include "LabPrototypeGate.h"
++#endif
+ 
+ // libretro_vulkan.h pulls in vulkan.h, which only declares a platform's surface
+ // types when that platform's VK_USE_PLATFORM_* macro is already defined. The
+@@ -1770,6 +1773,9 @@ RETRO_API void retro_reset(void)
+ 
+ RETRO_API bool retro_load_game(const struct retro_game_info* game)
+ {
++#ifdef RETROARCH_LAB_ARMSX2_BUILD_PROBE
++	return LabPrototypeCanLoad(environ_cb, log_cb);
++#endif
+ 	int format = RETRO_PIXEL_FORMAT_XRGB8888;
+ 	if (!environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &format))
+ 	{
