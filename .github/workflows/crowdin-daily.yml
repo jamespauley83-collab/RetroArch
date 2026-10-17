@@ -16,18 +16,34 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+      - name: Check Crowdin API key
+        id: crowdin_key
+        shell: bash
+        env:
+          CROWDIN_API_KEY: ${{ secrets.CROWDIN_API_KEY }}
+        run: |
+          if [ -n "$CROWDIN_API_KEY" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::CROWDIN_API_KEY is not configured; skipping Crowdin sync."
+          fi
       - name: Setup Java JDK
+        if: steps.crowdin_key.outputs.enabled == 'true'
         uses: actions/setup-java@v4
         with:
           java-version: 18
           distribution: zulu
       - name: Setup Python
+        if: steps.crowdin_key.outputs.enabled == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
       - name: Checkout
+        if: steps.crowdin_key.outputs.enabled == 'true'
         uses: actions/checkout@v5
       - name: Crowdin Sync
+        if: steps.crowdin_key.outputs.enabled == 'true'
         shell: bash
         env:
           CROWDIN_API_KEY: ${{ secrets.CROWDIN_API_KEY }}
