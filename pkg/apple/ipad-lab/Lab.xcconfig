@@ -1,0 +1,5 @@
+#include "../GitHubCI.xcconfig"
+
+// The Lab container must also be authorized by the device provisioning profile.
+OTHER_CFLAGS = $(inherited) -DHAVE_ICLOUD_DRIVE
+OTHER_CFLAGS = $(inherited) -DICLOUD_DRIVE_CONTAINER_NAME=@\"$(LAB_ICLOUD_CONTAINER)\"

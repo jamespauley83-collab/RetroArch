@@ -1,12 +1,14 @@
 #include "../cloud_sync_driver.h"
 #include "../../verbosity.h"
 
-#define ICLOUD_CONTAINER_NAME @"iCloud.com.libretro.dist.RetroArch"
+#ifndef ICLOUD_DRIVE_CONTAINER_NAME
+#define ICLOUD_DRIVE_CONTAINER_NAME @"iCloud.com.libretro.dist.RetroArch"
+#endif
 #define DOCUMENTS_BASE_FOLDER @"Documents"
 
 static NSURL *icloud_base_url(void)
 {
-   NSURL *base_url = [[NSFileManager defaultManager] URLForUbiquityContainerIdentifier:ICLOUD_CONTAINER_NAME];
+   NSURL *base_url = [[NSFileManager defaultManager] URLForUbiquityContainerIdentifier:ICLOUD_DRIVE_CONTAINER_NAME];
    return [base_url URLByAppendingPathComponent: DOCUMENTS_BASE_FOLDER];
 }
 
@@ -22,7 +24,7 @@ static NSURL *icloud_file_url(const char *path)
 
 static bool icloud_drive_sync_begin(cloud_sync_complete_handler_t cb, void *user_data)
 {
-   BOOL available = [[NSFileManager defaultManager] URLForUbiquityContainerIdentifier:ICLOUD_CONTAINER_NAME] != nil;
+   BOOL available = [[NSFileManager defaultManager] URLForUbiquityContainerIdentifier:ICLOUD_DRIVE_CONTAINER_NAME] != nil;
    cb(user_data, NULL, available, NULL);
    return true;
 }

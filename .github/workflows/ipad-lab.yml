@@ -6,10 +6,14 @@ on:
     branches: [codex/ipad-retroarch-lab]
     paths:
       - 'pkg/apple/ipad-lab/**'
+      - 'network/cloud_sync/icloud_drive.m'
+      - 'samples/network/icloud_drive/**'
       - '.github/workflows/ipad-lab.yml'
   pull_request:
     paths:
       - 'pkg/apple/ipad-lab/**'
+      - 'network/cloud_sync/icloud_drive.m'
+      - 'samples/network/icloud_drive/**'
       - '.github/workflows/ipad-lab.yml'
 
 permissions:
@@ -32,6 +36,12 @@ jobs:
         run: |
           python3 pkg/apple/ipad-lab/build.py --check
           python3 -m unittest discover -s pkg/apple/ipad-lab/tests -v
+      - name: Test default and Lab iCloud Drive containers
+        working-directory: samples/network/icloud_drive
+        run: |
+          make check
+          make clean
+          make check ICLOUD_DRIVE_CONTAINER=iCloud.com.jamespauley.retroarchlab
       - name: Build cores and iPad app
         run: python3 -u pkg/apple/ipad-lab/build.py
       - name: Upload unsigned IPA, sources, and manifest
