@@ -1,8 +1,10 @@
 # ARMSX2 launch investigation — October 17, 2026
 
-Status: failure stage identified; underlying device cause and gameplay recovery
-remain unconfirmed. Keep PR #12 draft. No application installation, JIT setting,
-game, memory card or iCloud data was changed by this investigation.
+Status: James reports the game now runs in **RetroArch Lab 8 Test** after the
+app-specific `universal.js` retry. The launch symptom is resolved by user report;
+the exact failed memory operation remains unobserved. Keep PR #12 draft for the
+remaining combined-app checks. This follow-up changes documentation only; it
+does not install an app or alter games, memory cards, JIT settings or iCloud data.
 
 ## Evidence
 
@@ -17,10 +19,16 @@ game, memory card or iCloud data was changed by this investigation.
   `CodeArena::Prepare(environ_cb, HostMemoryMap::CodeSize)`. It precedes the
   execution/cache probe, memory reservation and CPU/VM boot. Configuration has
   already initialized. This is not the core's later BIOS/VM boot error.
-- James already reported successful StikDebug activation for Lab 8 Test with
-  the same failure. A later assistant instruction asked for `universal.js`
-  assignment and ARMSX2-first retry. No outcome or script/RetroArch log from that
-  retry was available. Do not infer that the script was assigned or ran correctly.
+- James initially reported successful StikDebug activation for Lab 8 Test with
+  the same failure. When later asked, "What happened after assigning universal.js
+  specifically to RetroArch Lab 8 Test and retrying ARMSX2?", he replied:
+  **"The game now runs."** This is combined-app launch evidence from the user.
+  It does not establish every step of the suggested retry, the executable-memory
+  mode, or a full graphics/audio/controls/save/lifecycle pass.
+- The recovery supports an application-specific JIT/script setup explanation.
+  Without paired script/runtime logs, it does not isolate failed region
+  preparation from mapping, capacity or other process-state differences.
+  No source rebuild or BIOS replacement was reported as part of the recovery.
 - The installer and earlier report identify iPadOS 27.2; a later abbreviated
   context says iPadOS 26. Both meet the 26+ floor, but a device log should record
   the exact current version. The screenshot alone does not establish OS/model.
@@ -56,10 +64,12 @@ probe/allocation mode, capacity and actual BIOS/resource paths. Frontend logs
 record the app ID/PID and mapping or region-preparation error. The earlier single
 message collapsed these failures and could not support a root-cause diagnosis.
 
-This corrects the independent gate/diagnostic defects; it is **not evidence that
-the reported iPad launch failure is fixed**.
+Commit `b0a26e4107e37112292a85754b4adadc2398b261` already contains this correction
+and its regression tests. The successful retry is separate device evidence and
+must not be attributed to these unbuilt source changes. No additional source
+defect is established by the recovery report.
 
-## Automated validation
+## Automated validation recorded for b0a26e4
 
 - 39 Lab Python tests pass, including packaging/isolation and the ARMSX2 gate
   regression; 12 ARMSX2 packaging/validation Python tests pass.
@@ -68,18 +78,27 @@ the reported iPad launch failure is fixed**.
   allocations, capacity failures, diagnostic classification, retry, ownership,
   cache-call ordering and frame transport. Cache operations are stubbed; no
   generated ARM64 code or complete PS2 VM executes in these tests.
-- No new iPhoneOS build, signed IPA or physical-device pass is claimed. The
-  existing Files-Fix package remains unchanged and lacks these new diagnostics.
-- Use `[skip ci]` for this source investigation to avoid the repository's broad
-  automatic platform builds while the existing installed app's script/log check
-  is pending. A targeted iPad build is needed before using the new diagnostics.
+- These are the previously recorded results for the source correction, not a
+  fresh test run for this documentation follow-up. The correction and regression
+  coverage were re-inspected; no executable source is changed here.
+- No iPhoneOS build or signed IPA containing the correction is claimed. The
+  existing Files-Fix package lacks the new diagnostics. James's launch recovery
+  is a user-reported device result for his installed test app.
+- This documentation update uses `[skip ci]` to avoid unnecessary broad platform
+  builds. A targeted iPad build remains necessary to compile and device-test
+  the source correction before promoting it.
 
 ## Remaining device evidence
 
-Follow the script-specific retry/log capture in
-[EIGHT-CORE-DEVICE-TEST.md](EIGHT-CORE-DEVICE-TEST.md). Obtain the StikDebug script
-output and RetroArch log from the same failed process. If it boots after that
-retry, record the result as a device configuration outcome and repeat the
-combined-app gameplay/save/switching checks. If it still fails, use the logs (and
-a targeted diagnostic build if needed) to select a correction rather than
-relaxing mode requirements, replacing BIOS blindly or overwriting another app.
+Continue with the combined-app gameplay, fresh local memory-card save/reload,
+restart with JIT reactivation as needed, and core-switching checks in
+[EIGHT-CORE-DEVICE-TEST.md](EIGHT-CORE-DEVICE-TEST.md). Preserve the reported
+Yabause pass and original-library observation. The standalone PS2 Test save
+result does not establish Lab 8 Test save persistence.
+
+Do not repeat a successful launch solely to recreate the old failure. Retain
+existing failed-attempt logs if available; if the error recurs, capture the
+StikDebug script output and RetroArch log from that same process. The exact
+failed operation can remain unknown without blocking use of the working test
+configuration. Keep the working Lab, standalone PS2 Test, their saves and cloud
+data intact; use fresh local test data and leave test-app cloud sync off.

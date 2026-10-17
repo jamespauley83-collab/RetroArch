@@ -121,7 +121,7 @@ crash as a failure, not a gameplay pass. Re-enable JIT after process termination
 when required by the activation method. Do not assume one successful activation
 persists across force quits, restarts, or app changes.
 
-### October 17 ARMSX2 failure: next diagnostic check
+### October 17 ARMSX2 launch recovery and recurrence diagnostics
 
 The recovered 08:41 screenshot shows **Need for Speed - Most Wanted - Black
 Edition (USA)** in the Advanced menu, with the exact error:
@@ -135,19 +135,24 @@ the native Library gate. James already reported that StikDebug showed successful
 JIT activation for **this test app** while the error persisted. Successful attach
 does not establish that the executable region was prepared successfully.
 
-The earlier troubleshooting asked for `universal.js` to be assigned to this app
-in StikDebug, followed by a fresh activation and ARMSX2 as the first core. The
-result of that script-specific retry is not recorded. Preserve that distinction;
-do not send James back through the already completed generic activation check.
+James subsequently answered the question about assigning **universal.js**
+specifically to **RetroArch Lab 8 Test** and retrying ARMSX2: **"The game now
+runs."** Record combined-app launch as passed by user report. This supports an
+app-specific JIT/script setup explanation, but no failed-attempt log establishes
+the exact memory operation. The recovery does not validate the later source
+correction or all gameplay/save/switching checks.
+
+Continue with the remaining physical tests below. Use the diagnostic steps here
+only if the failure recurs, or to preserve logs that already exist. Do not
+reinstall, replace BIOS, migrate saves or deliberately recreate the old failure.
 
 1. In this test app, enable **Settings > Logging > Logging Verbosity** and
    **Log to File**, with frontend/core log levels at **1 (Info)**. Note
    **Settings > Directory > Logs**, then save configuration. Copy any existing
    failure log before restarting so it is not overwritten.
-2. Save/close any active content normally. If the script-specific retry is still
-   outstanding, use the established StikDebug setup to assign **universal.js**
-   to **RetroArch Lab 8 Test**, ID
-   `com.jamespauley.retroarchlab.eightcoretest`, and activate it for a fresh
+2. If the launch failure recurs, save/close active content normally. Confirm
+   **universal.js** remains assigned in StikDebug to **RetroArch Lab 8 Test**,
+   ID `com.jamespauley.retroarchlab.eightcoretest`, and activate it for a fresh
    process. Open ARMSX2 first, without force-quitting after activation.
 3. If it still fails, retain the **StikDebug script output** and the test app's
    **RetroArch log** from that same attempt. Share copies through Files. These
@@ -157,8 +162,9 @@ do not send James back through the already completed generic activation check.
    `<System/BIOS>/pcsx2/bios/<BIOS file>` and
    `<System/BIOS>/pcsx2/resources/fonts/Roboto-Regular.ttf`. A folder named
    `System/BIOS` is not a literal required path; use the directory shown in
-   settings. Do not redirect it to another app or iCloud. BIOS validity remains
-   unverified until the memory check passes and BIOS boot runs.
+   settings. Do not redirect it to another app or iCloud. The reported game
+   launch demonstrates sufficient setup for that attempt; the exact BIOS file,
+   paths and separate BIOS-menu check have not been independently recorded.
 
 The source follow-up removes ARMSX2's duplicate generic Library gate, leaving
 the core's required allocation check authoritative for both entry points. It
@@ -182,11 +188,12 @@ for source comparison and the separation between automated and device evidence.
 
 ## Focused physical tests
 
-October 17 update: James reports the original library is intact and Yabause
-works in Lab 8 Test. ARMSX2 fails at arena preparation. Preserve those results;
-continue at the ARMSX2 diagnostic check before marking combined-app PS2, switching,
-save persistence or iCloud regression checks passed. Automated tests do not
-replace these device observations.
+October 17 update: James reports the original library is intact, Yabause works,
+and ARMSX2 now runs a game in Lab 8 Test after the app-specific script retry.
+Keep these observations separate from automated tests and the standalone PS2
+Test pass. The ARMSX2 launch symptom is resolved by user report; sustained
+graphics/audio/controls, fresh save/reload after restart, core switching and
+working-app/iCloud regression still need their own evidence.
 
 Record app revision from the manifest, package SHA, iPad model/OS, signer/final
 ID, JIT method, BIOS region, exact game edition/title ID, and controller used.

@@ -60,6 +60,13 @@ Test**, and performed much better than Play!. The exact game edition, device/OS,
 and installed build revision were not recorded. This is a user-reported result
 for one game, not a benchmark or acceptance of every subsequent build.
 
+On October 17, James also reported that a game now runs through ARMSX2 in
+**RetroArch Lab 8 Test** after assigning `universal.js` to that app and retrying.
+This records launch recovery in the combined app; its save/reload and
+core-switching checks remain separate. See the
+[launch investigation](PS2-LAUNCH-INVESTIGATION-2026-10-17.md) for the failure
+stage, source comparison and evidence limits.
+
 Pull requests run the eight-core candidate build. For a manual run, use
 **RetroArch Lab iPad** with `with_armsx2` enabled on this integration branch.
 The workflow builds the corrected ARMSX2 device-test core from the same revision
@@ -80,12 +87,20 @@ The ordinary build without this option retains the seven-core/iOS 15 baseline.
 The combined app still needs its own build and device validation; the separate
 PS2 Test app result does not validate combined-app lifecycle or iCloud behavior.
 
-After signing, extract the supplied `ARMSX2-system-files.zip` into Lab's configured
-System/BIOS directory and copy your PS2 BIOS into its `pcsx2/bios` subfolder.
-Enable JIT for **RetroArch Lab**. In Advanced, choose **Sony - PlayStation 2
-(ARMSX2 Lab - Recommended)** and assign it to the PS2 games you want to use from
-the library. Existing Play! assignments are not rewritten; Play! remains a
-fallback. The library now checks JIT for ARMSX2 before attempting launch.
+For isolated testing, extract the supplied `ARMSX2-system-files.zip` into
+**RetroArch Lab 8 Test**'s configured System/BIOS directory and copy your PS2 BIOS
+into its `pcsx2/bios` subfolder. Enable JIT for that exact app,
+`com.jamespauley.retroarchlab.eightcoretest`, with its assigned `universal.js`;
+activation for working Lab or PS2 Test does not activate this process.
+In Advanced, choose **Sony - PlayStation 2 (ARMSX2 Lab - Recommended)** and assign
+it to the local test games you want to use from the library. Existing Play!
+assignments are not rewritten; Play! remains a fallback.
+
+The current source delegates ARMSX2 validation to its own mode 2/4 arena check
+for both launch routes; Dolphin and Play! retain the generic Library JIT gate.
+The existing Files-Fix IPA predates this correction and the new failure
+diagnostics. A targeted iPhoneOS build is still required to validate those source
+changes; the reported launch recovery is not a test of that unbuilt code.
 
 Keep the working PS2 Test app and its saves. This build does not migrate its
 sandbox, convert Play! memory cards, or establish ARMSX2 iCloud save coverage.
