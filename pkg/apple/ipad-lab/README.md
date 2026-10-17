@@ -42,6 +42,17 @@ Verify these before device signing, which can change the executable bytes.
 
 ## ARMSX2 integration candidate
 
+**For first physical-device testing, use the separate
+[eight-core test copy](EIGHT-CORE-DEVICE-TEST.md).** The original
+`RetroArch-Lab-unsigned.ipa` uses the working Lab identity and is an update, not
+a side-by-side test install. The workflow now also produces an `eight-core-test`
+subfolder with `RetroArch-Lab-8-Test-unsigned.ipa`, a separate identifier and no
+widget. Sign it without cloud/app-group entitlements and use fresh local copies.
+The standalone `package_eight_core_test.py` can derive it from an already
+verified artifact without recompiling emulator code. Successful candidate cloud
+sync is deferred to a dedicated-container build; do not authorize this test copy
+to access the working Lab container.
+
 ARMSX2 is the recommended PS2 core for the optional eight-core candidate. On
 October 16, 2026, James reported that Need for Speed passed game boot, graphics,
 sound, controls, in-game save/load, and reopening/reloading in **RetroArch PS2
@@ -310,3 +321,4 @@ Linux x86-64 additionally executes generated and patched code in the harness.
 
 References: [Play! source and iOS instructions](https://github.com/jpd002/Play-),
 [Libretro Play! documentation](https://docs.libretro.com/library/play/).
+

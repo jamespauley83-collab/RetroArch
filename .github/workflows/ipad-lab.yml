@@ -77,6 +77,12 @@ jobs:
           args=()
           if [ "$WITH_ARMSX2" = true ]; then args+=(--with-armsx2); fi
           python3 -u pkg/apple/ipad-lab/build.py "${args[@]}"
+      - name: Package separate eight-core device-test copy
+        if: github.event_name == 'pull_request' || inputs.with_armsx2
+        run: |
+          for artifact_dir in .ipad-lab-build/*/artifacts; do
+            python3 pkg/apple/ipad-lab/package_eight_core_test.py "$artifact_dir" "$artifact_dir/eight-core-test"
+          done
       - name: Upload unsigned IPA, sources, and manifest
         uses: actions/upload-artifact@v4
         with:
@@ -96,3 +102,4 @@ jobs:
           include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 14
+
