@@ -114,6 +114,67 @@ def package_dolphin_system(repo, artifacts):
             'sha256': hashlib.sha256(archive_path.read_bytes()).hexdigest()}
 
 
+def armsx2_inputs(root, revision):
+    directory = root / '.armsx2-prototype/artifacts'
+    manifest = json.loads((directory / 'manifest.json').read_text())
+    binary = directory / 'armsx2_libretro.dylib'
+    expected = {
+        'upstream_commit': 'e58489d349cdcd635fc6264546087e347c84bf8c',
+        'lab_commit': revision, 'stage': 'device-test',
+        'architecture': 'arm64', 'platform': 'iOS', 'minimum_ios': '17.4',
+    }
+    if any(manifest.get(key) != value for key, value in expected.items()):
+        raise ValueError('ARMSX2 must be built for this revision with the device-test recipe.')
+    if manifest.get('gameplay_enabled') is not True:
+        raise ValueError('ARMSX2 gameplay must be enabled.')
+    data = binary.read_bytes()
+    if hashlib.sha256(data).hexdigest() != manifest.get('sha256'):
+        raise ValueError('ARMSX2 binary checksum mismatch.')
+    if (b'ARMSX2 Lab device test: experimental boot' not in data
+            or b'ARMSX2 Lab build probe: gameplay disabled' in data):
+        raise ValueError('ARMSX2 binary has the wrong stage marker.')
+    patches = root / LAB / 'experiments/armsx2/patches'
+    hashes = {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+              for p in sorted(patches.glob('*.patch'))}
+    if len(hashes) < 4 or manifest.get('patches') != hashes:
+        raise ValueError('ARMSX2 patch provenance mismatch.')
+    required = ['manifest.json', 'binary-inspection.json', 'armsx2-pinned-source.tar.gz',
+                'dependency-sources.tar.gz', 'dependency-SHASUMS', 'ARMSX2-COPYING.GPLv3']
+    for name in required + list(hashes):
+        if not (directory / name).is_file():
+            raise ValueError('ARMSX2 source/provenance file missing: ' + name)
+    for name, digest in hashes.items():
+        if hashlib.sha256((directory / name).read_bytes()).hexdigest() != digest:
+            raise ValueError('ARMSX2 archived patch checksum mismatch.')
+    fonts = root / '.armsx2-prototype/source/bin/resources/fonts'
+    if not (fonts / 'Roboto-Regular.ttf').is_file():
+        raise ValueError('ARMSX2 font resources missing.')
+    return directory, binary, manifest, fonts, required + list(hashes)
+
+
+def add_armsx2(root, revision, modules, artifacts, lock, manifest):
+    directory, binary, core_manifest, fonts, provenance = armsx2_inputs(root, revision)
+    shutil.copy2(binary, modules / 'armsx2_libretro_ios.dylib')
+    destination = artifacts / 'ARMSX2-provenance'
+    destination.mkdir()
+    for name in provenance:
+        shutil.copy2(directory / name, destination / name)
+    system = artifacts / 'ARMSX2-system-files.zip'
+    with zipfile.ZipFile(system, 'w', zipfile.ZIP_DEFLATED) as archive:
+        for path in sorted(fonts.iterdir()):
+            if path.is_file():
+                archive.write(path, 'pcsx2/resources/fonts/' + path.name)
+    core = {'name': 'armsx2', 'system': 'Sony PlayStation 2',
+            'repository': 'https://github.com/ARMSX2/ARMSX2.git',
+            'commit': core_manifest['upstream_commit']}
+    lock['cores'].append(core)
+    manifest['cores'].append(dict(core, patches=core_manifest['patches'],
+        stage='device-test', input_sha256=core_manifest['sha256'],
+        provenance_directory=destination.name,
+        system_files={'file': system.name, 'sha256': hashlib.sha256(system.read_bytes()).hexdigest()}))
+    manifest['preferred_ps2_core'] = 'armsx2'
+
+
 def customize_plist(path, lock):
     with path.open('rb') as stream:
         info = plistlib.load(stream)
@@ -157,6 +218,15 @@ def core_binary_path(core):
     return Path('Frameworks') / (framework + '.framework') / framework
 
 
+def validate_armsx2_os(info):
+    version = info.get('MinimumOSVersion', '')
+    if not isinstance(version, str) or not re.fullmatch(r'[0-9]+(?:\.[0-9]+){0,2}', version):
+        raise ValueError('ARMSX2 requires a valid app minimum iOS version.')
+    parts = tuple(int(part) for part in version.split('.'))
+    if parts + (0,) * (3 - len(parts)) < (17, 4, 0):
+        raise ValueError('ARMSX2 requires iOS 17.4 or later.')
+
+
 def validate_app(app, lock):
     with (app / 'Info.plist').open('rb') as stream:
         info = plistlib.load(stream)
@@ -166,6 +236,8 @@ def validate_app(app, lock):
         raise ValueError('Built app has the wrong display name.')
     if not (app / info['CFBundleExecutable']).is_file():
         raise ValueError('Built app executable is missing.')
+    if any(core['name'] == 'armsx2' for core in lock['cores']):
+        validate_armsx2_os(info)
     for extension in (app / 'PlugIns').glob('*.appex'):
         with (extension / 'Info.plist').open('rb') as stream:
             ext = plistlib.load(stream)
@@ -194,6 +266,8 @@ def package_app(app, work, artifacts, manifest):
     ipa = artifacts / 'RetroArch-Lab-unsigned.ipa'
     run('ditto', '-c', '-k', '--keepParent', payload, ipa)
     with zipfile.ZipFile(ipa) as archive:
+        if any(core['name'] == 'armsx2' for core in manifest['cores']):
+            validate_armsx2_os(plistlib.loads(archive.read('Payload/' + app.name + '/Info.plist')))
         for core in manifest['cores']:
             if hashlib.sha256(archive.read(core['binary_path'])).hexdigest() != core['sha256']:
                 raise ValueError('Packaged core checksum mismatch: ' + core['name'])
@@ -202,7 +276,7 @@ def package_app(app, work, artifacts, manifest):
     return ipa
 
 
-def build(root):
+def build(root, with_armsx2=False):
     if platform.system() != 'Darwin' or not shutil.which('xcodebuild'):
         raise RuntimeError('The iPad build requires macOS with full Xcode; use the GitHub Actions workflow.')
     revision = output('git', 'rev-parse', 'HEAD', cwd=root)
@@ -218,6 +292,9 @@ def build(root):
     run('tar', '-xf', work / 'source.tar', '-C', source)
     (work / 'source.tar').unlink()
     lock = load_lock(source / LAB / 'cores.lock.json')
+    if with_armsx2:
+        armsx2_inputs(root, revision)
+        lock['minimum_ios'] = '17.4'
     apple = source / 'pkg/apple'
     overlay_core_info(source)
     customize_plist(apple / 'iOS/Info.plist', lock)
@@ -231,6 +308,8 @@ def build(root):
         'retroarch_commit': revision,
         'bundle_id': lock['bundle_id'],
         'device_signed': False,
+        'device_tested': False,
+        'minimum_ios': lock['minimum_ios'],
         'xcode': output('xcodebuild', '-version'),
         'sdk': output('xcrun', '--sdk', 'iphoneos', '--show-sdk-version'),
         'cores': [],
@@ -288,6 +367,8 @@ def build(root):
         if core.get('recipe') == 'dolphin-cmake':
             record['system_files'] = package_dolphin_system(repo, artifacts)
         manifest['cores'].append(dict(record, patches=patch_hashes))
+    if with_armsx2:
+        add_armsx2(root, revision, modules, artifacts, lock, manifest)
     with (work / 'xcodebuild.log').open('w') as log:
         subprocess.run([
             'xcodebuild', '-project', str(apple / 'RetroArch_iOS13.xcodeproj'),
@@ -316,10 +397,15 @@ def build(root):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--with-armsx2', action='store_true',
+                        help='Add the same-revision ARMSX2 device-test build as a seventh core')
     parser.add_argument('--check', action='store_true', help='Validate inputs without Xcode or downloads')
     args = parser.parse_args()
     lock = load_lock(ROOT / LAB / 'cores.lock.json')
     if args.check:
+        if args.with_armsx2:
+            armsx2_inputs(ROOT, output('git', 'rev-parse', 'HEAD', cwd=ROOT))
+            lock['cores'].append({'name': 'armsx2'})
         with zipfile.ZipFile(ROOT / 'pkg/apple/assets.zip') as assets:
             for core in lock['cores']:
                 if ('info/' + core['name'] + '_libretro.info' not in assets.namelist()
@@ -327,7 +413,7 @@ def main():
                     raise ValueError('Core info missing from bundled assets: ' + core['name'])
         print('Inputs valid: ' + ', '.join(c['name'] for c in lock['cores']))
     else:
-        build(ROOT)
+        build(ROOT, with_armsx2=args.with_armsx2)
 
 
 if __name__ == '__main__':

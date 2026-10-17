@@ -40,6 +40,45 @@ The build checks those hashes against the completed IPA. The embedded
 `build-manifest.json` also includes `ipa_sha256` for the whole archive.
 Verify these before device signing, which can change the executable bytes.
 
+## ARMSX2 integration candidate
+
+ARMSX2 is the recommended PS2 core for the optional seven-core candidate. On
+October 16, 2026, James reported that Need for Speed passed game boot, graphics,
+sound, controls, in-game save/load, and reopening/reloading in **RetroArch PS2
+Test**, and performed much better than Play!. The exact game edition, device/OS,
+and installed build revision were not recorded. This is a user-reported result
+for one game, not a benchmark or acceptance of every subsequent build.
+
+Pull requests run the seven-core candidate build. For a manual run, use
+**RetroArch Lab iPad** with `with_armsx2` enabled on this integration branch.
+The workflow builds the corrected ARMSX2 device-test core from the same revision
+before adding it to the normal Lab app. For a local Mac build, prepare a fresh
+`.armsx2-prototype/source` checkout at the pin in the experiment workflow, then:
+
+```sh
+bash pkg/apple/ipad-lab/experiments/armsx2/build.sh device-test
+python3 pkg/apple/ipad-lab/build.py --check --with-armsx2
+python3 -u pkg/apple/ipad-lab/build.py --with-armsx2
+```
+
+This candidate requires **iOS 17.4+**. It retains the six existing cores, library,
+Lab identity and iCloud configuration, adding ARMSX2 and its source provenance.
+The ordinary build without this option retains the six-core/iOS 15 baseline.
+The combined app still needs its own build and device validation; the separate
+PS2 Test app result does not validate combined-app lifecycle or iCloud behavior.
+
+After signing, extract the supplied `ARMSX2-system-files.zip` into Lab's configured
+System/BIOS directory and copy your PS2 BIOS into its `pcsx2/bios` subfolder.
+Enable JIT for **RetroArch Lab**. In Advanced, choose **Sony - PlayStation 2
+(ARMSX2 Lab - Recommended)** and assign it to the PS2 games you want to use from
+the library. Existing Play! assignments are not rewritten; Play! remains a
+fallback. The library now checks JIT for ARMSX2 before attempting launch.
+
+Keep the working PS2 Test app and its saves. This build does not migrate its
+sandbox, convert Play! memory cards, or establish ARMSX2 iCloud save coverage.
+Use copied test data first and verify saving/reloading and switching between
+ARMSX2 and a non-PS2 core in the combined app.
+
 ## Install and test
 
 The IPA is **not device-signed and cannot be installed directly**. Its embedded

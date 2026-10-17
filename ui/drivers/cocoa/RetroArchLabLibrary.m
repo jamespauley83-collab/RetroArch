@@ -396,7 +396,8 @@ bool cocoa_lab_library_visible(void) { return ra_lab_library_visible; }
    if (!core)
    { [self showProblem:@"Assign an installed core to this game or playlist in Advanced. The library will not guess a console from .iso or .chd."]; return; }
    NSString *identifier = RALabCoreIdentifier(core);
-   if (([identifier isEqualToString:@"dolphin"] || [identifier isEqualToString:@"play"]) && !jit_available())
+   if (([identifier isEqualToString:@"dolphin"] || [identifier isEqualToString:@"play"]
+         || [identifier isEqualToString:@"armsx2"]) && !jit_available())
    { [self showProblem:@"This Lab core needs JIT. Enable JIT for RetroArch Lab with StikDebug, then try again. Other cores may not need JIT."]; return; }
    if (!retroarch_ctl(RARCH_CTL_IS_DUMMY_CORE, NULL))
    {
