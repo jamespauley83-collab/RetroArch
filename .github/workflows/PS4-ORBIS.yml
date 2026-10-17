@@ -18,7 +18,15 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
 jobs:
+  lab-scope:
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/ipad-change-scope.yml
+
   build:
+    needs: lab-scope
+    if: ${{ !cancelled() && needs.lab-scope.outputs.build != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # The image is Alpine 3.15, whose musl cannot load the runner's
