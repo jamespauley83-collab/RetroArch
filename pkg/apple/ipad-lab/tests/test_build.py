@@ -197,6 +197,46 @@ class PackagingTests(unittest.TestCase):
                 self.assertEqual(binary, directory / 'yabause_libretro_ios.dylib')
                 self.assertEqual(binary.read_text(), '-miphoneos-version-min=' + version)
 
+    def test_yabause_zlib_patch_keeps_fdopen_out_of_apple_sdk_headers(self):
+        header = self.root / 'yabause/src/libchdr/deps/zlib-1.2.11/zutil.h'
+        header.parent.mkdir(parents=True)
+        header.write_text(
+            '#if 1\n'
+            '#if 1\n'
+            '#  endif\n'
+            '#endif\n'
+            '\n'
+            '#if defined(MACOS) || defined(TARGET_OS_MAC)\n'
+            '#  define OS_CODE  7\n'
+            '#  ifndef Z_SOLO\n'
+            '#    if defined(__MWERKS__) && __dest_os != __be_os && __dest_os != __win32_os\n'
+            '#      include <unix.h>\n'
+            '#    else\n'
+            '#      ifndef fdopen\n'
+            '#        define fdopen(fd,mode) NULL\n'
+            '#      endif\n'
+            '#    endif\n'
+            '#  endif\n'
+            '#endif\n')
+        patch = (build.ROOT / build.LAB / 'patches/yabause/0001-darwin-zlib-platform.patch')
+        build.run('git', 'apply', patch, cwd=self.root)
+        source = self.root / 'check_fdopen.c'
+        source.write_text(
+            '#include <stddef.h>\n'
+            '#ifndef TARGET_OS_MAC\n'
+            '#define TARGET_OS_MAC 1\n'
+            '#endif\n'
+            '#ifndef __APPLE__\n'
+            '#define __APPLE__ 1\n'
+            '#endif\n'
+            '#include "yabause/src/libchdr/deps/zlib-1.2.11/zutil.h"\n'
+            '#include <stdio.h>\n'
+            'int main(void) { return 0; }\n')
+        compiler = shutil.which('cc')
+        if not compiler:
+            self.skipTest('C compiler is unavailable')
+        build.run(compiler, '-fsyntax-only', source, cwd=self.root)
+
     def test_icloud_entitlements_are_isolated_and_follow_lab_identity(self):
         lock = dict(self.lock, bundle_id='com.jamespauley.retroarchlab.test')
         entitlements = build.icloud_entitlements(lock)
