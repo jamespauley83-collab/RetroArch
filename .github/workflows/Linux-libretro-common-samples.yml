@@ -23,11 +23,11 @@ jobs:
   samples:
     name: Build and run libretro-common/samples
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     steps:
       - name: Install dependencies
-        timeout-minutes: 5
+        timeout-minutes: 15
         run: |
           # All three packages ship on the stock ubuntu-latest image, so
           # this step is a no-op there and apt is only contacted if the
@@ -699,11 +699,11 @@ jobs:
   config-file-fuzz-smoke:
     name: config_file differential fuzz (smoke)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
 
     steps:
       - name: Install dependencies
-        timeout-minutes: 5
+        timeout-minutes: 15
         run: |
           # clang ships on the stock ubuntu-latest image; apt is only
           # contacted if the image ever drops it.
@@ -788,7 +788,7 @@ jobs:
   retro-atomic-cross:
     name: Cross-arch retro_atomic_test (${{ matrix.arch }})
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -806,7 +806,7 @@ jobs:
 
     steps:
       - name: Install dependencies
-        timeout-minutes: 5
+        timeout-minutes: 15
         run: |
           for i in 1 2 3; do
             sudo timeout 90 apt-get update -y \
@@ -909,7 +909,7 @@ jobs:
   crc32-cross:
     name: Cross-arch crc32_test (${{ matrix.name }})
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -941,7 +941,7 @@ jobs:
 
     steps:
       - name: Install dependencies
-        timeout-minutes: 5
+        timeout-minutes: 15
         run: |
           for i in 1 2 3; do
             sudo timeout 90 apt-get update -y \
