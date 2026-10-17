@@ -41,6 +41,23 @@ int main(void)
       CHECK(RALabResolveCore(@"/old/mednafen_saturn_libretro_ios.dylib", @[]) == nil);
       CHECK(RALabResolveCore(@"/old/mednafen_saturn_libretro_ios.dylib",
             @[cores[0], cores[1]]) == nil);
+      NSArray *withPS2 = [cores arrayByAddingObject:
+            @"/app/armsx2.libretro.framework/armsx2.libretro"];
+      CHECK([RALabResolveCore(@"/old/armsx2_libretro_ios.dylib", withPS2)
+            isEqualToString:withPS2.lastObject]);
+      CHECK([RALabResolveCore(@"/old/play_libretro_ios.dylib", withPS2)
+            isEqualToString:cores[1]]);
+      CHECK(RALabResolveCore(@"/old/armsx2_libretro_ios.dylib", cores) == nil);
+      CHECK(RALabResolveCore(@"game.iso", withPS2) == nil);
+      NSArray *withSaturn = [withPS2 arrayByAddingObject:
+            @"/app/yabause.libretro.framework/yabause.libretro"];
+      CHECK([RALabResolveCore(@"/old/yabause_libretro_ios.dylib", withSaturn)
+            isEqualToString:withSaturn.lastObject]);
+      CHECK([RALabResolveCore(@"/old/mednafen_saturn_libretro.so", withSaturn)
+            isEqualToString:cores[2]]);
+      CHECK(RALabResolveCore(@"/old/yabasanshiro_libretro_ios.dylib", withSaturn) == nil);
+      CHECK(![RALabEntryKey(@"/Games/Saturn.chd", cores[2])
+            isEqual:RALabEntryKey(@"/Games/Saturn.chd", withSaturn.lastObject)]);
       CHECK(RALabResolveCore(@"game.iso", cores) == nil);
       CHECK(RALabResolveCore(@"game.chd", cores) == nil);
       CHECK(RALabResolveCore(@"/old/dolphin_libretro.so",

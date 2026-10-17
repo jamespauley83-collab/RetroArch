@@ -2,6 +2,11 @@ name: RetroArch Lab iPad
 
 on:
   workflow_dispatch:
+    inputs:
+      with_armsx2:
+        description: Include ARMSX2 as the preferred PS2 core alongside Play!
+        type: boolean
+        default: false
   push:
     branches: [codex/ipad-retroarch-lab]
     paths:
@@ -33,11 +38,14 @@ jobs:
   build:
     if: github.repository == 'jamespauley83-collab/RetroArch'
     runs-on: macos-15
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - name: Select Xcode 26 for ARMSX2
+        if: github.event_name == 'pull_request' || inputs.with_armsx2
+        run: echo 'DEVELOPER_DIR=/Applications/Xcode_26.3.app/Contents/Developer' >> "$GITHUB_ENV"
       - name: Validate build inputs and packaging checks
         run: |
           python3 pkg/apple/ipad-lab/build.py --check
@@ -50,8 +58,31 @@ jobs:
           make check
           make clean
           make check ICLOUD_DRIVE_CONTAINER=iCloud.com.jamespauley.retroarchlab
+      - uses: actions/checkout@v6
+        if: github.event_name == 'pull_request' || inputs.with_armsx2
+        with:
+          repository: ARMSX2/ARMSX2
+          ref: e58489d349cdcd635fc6264546087e347c84bf8c
+          path: .armsx2-prototype/source
+          persist-credentials: false
+      - name: Build and validate the optional ARMSX2 core
+        if: github.event_name == 'pull_request' || inputs.with_armsx2
+        run: |
+          python3 -m unittest discover -s pkg/apple/ipad-lab/experiments/armsx2 -p 'test_*.py' -v
+          bash pkg/apple/ipad-lab/experiments/armsx2/build.sh device-test
       - name: Build cores and iPad app
-        run: python3 -u pkg/apple/ipad-lab/build.py
+        env:
+          WITH_ARMSX2: ${{ github.event_name == 'pull_request' || inputs.with_armsx2 }}
+        run: |
+          args=()
+          if [ "$WITH_ARMSX2" = true ]; then args+=(--with-armsx2); fi
+          python3 -u pkg/apple/ipad-lab/build.py "${args[@]}"
+      - name: Package separate eight-core device-test copy
+        if: github.event_name == 'pull_request' || inputs.with_armsx2
+        run: |
+          for artifact_dir in .ipad-lab-build/*/artifacts; do
+            python3 pkg/apple/ipad-lab/package_eight_core_test.py "$artifact_dir" "$artifact_dir/eight-core-test"
+          done
       - name: Upload unsigned IPA, sources, and manifest
         uses: actions/upload-artifact@v4
         with:
@@ -65,7 +96,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: RetroArch-Lab-logs-${{ github.run_id }}-${{ github.run_attempt }}
-          path: .ipad-lab-build/*/*.log
+          path: |
+            .ipad-lab-build/*/*.log
+            .armsx2-prototype/*.log
           include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 14
+

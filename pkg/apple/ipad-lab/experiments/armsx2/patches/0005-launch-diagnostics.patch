@@ -1,0 +1,90 @@
+diff --git a/common/LabFrontend.h b/common/LabFrontend.h
+index b57c62d62..3414d6481 100644
+--- a/common/LabFrontend.h
++++ b/common/LabFrontend.h
+@@ -20,21 +20,43 @@ struct Allocation
+ 	void* rw;
+ };
+ struct ReleaseRequest { void* rx; };
++struct ArenaReport
++{
++	const char* error = nullptr;
++	Allocation probe{};
++	Allocation allocation{};
++};
+ class CodeArena
+ {
+ public:
+ 	CodeArena() = default;
+ 	CodeArena(const CodeArena&) = delete;
+ 	CodeArena& operator=(const CodeArena&) = delete;
+-	bool Prepare(Environment environment, size_t size)
++	bool Prepare(Environment environment, size_t size, ArenaReport* report = nullptr)
+ 	{
+-		if (m_allocation.rx) return size <= m_allocation.size;
+-		if (!environment || !size) return false;
++		ArenaReport ignored;
++		ArenaReport& result = report ? *report : ignored;
++		result = {};
++		auto fail = [&](const char* error) { result.error = error; return false; };
++		if (m_allocation.rx)
++		{
++			result.allocation = m_allocation;
++			return size <= m_allocation.size || fail("ARMSX2: existing JIT arena is too small.");
++		}
++		if (!environment || !size) return fail("ARMSX2: invalid executable-memory request.");
+ 		Allocation probe{1, 0, 0, nullptr, nullptr};
+-		if (!environment(83, &probe) || (probe.mode != 2 && probe.mode != 4) ||
+-			(probe.size && probe.size < size)) return false;
++		const bool supported = environment(83, &probe);
++		result.probe = probe;
++		if (!supported) return fail("ARMSX2: frontend executable-memory API is unavailable.");
++		if (probe.mode == 0)
++			return fail("ARMSX2: no executable memory. Enable JIT for this test app; see the JIT log if already enabled.");
++		if (probe.mode != 2 && probe.mode != 4)
++			return fail("ARMSX2: unsupported JIT memory mode. Requires iOS 26+ and RWX/dual-map; WX-toggle is unsupported.");
++		if (probe.size && probe.size < size)
++			return fail("ARMSX2: not enough free JIT arena space. Close content and retry; see the log for sizes.");
+ 		Allocation allocation{1, size, 0, nullptr, nullptr};
+ 		const bool allocated = environment(83, &allocation);
++		result.allocation = allocation;
+ 		const uintptr_t rx = reinterpret_cast<uintptr_t>(allocation.rx);
+ 		const uintptr_t rw = reinterpret_cast<uintptr_t>(allocation.rw);
+ 		const uintptr_t distance = rx > rw ? rx - rw : rw - rx;
+@@ -46,7 +68,9 @@ public:
+ 			distance > static_cast<uintptr_t>(std::numeric_limits<ptrdiff_t>::max()))
+ 		{
+ 			if (allocation.rx) { ReleaseRequest release{allocation.rx}; environment(84, &release); }
+-			return false;
++			if (!allocated || allocation.mode == 0)
++				return fail("ARMSX2: JIT arena allocation failed. See the frontend JIT log for the failed operation.");
++			return fail("ARMSX2: frontend returned an invalid JIT arena. See the log for mode, size and alignment.");
+ 		}
+ 		m_environment = environment;
+ 		m_allocation = allocation;
+diff --git a/pcsx2-libretro/Main.cpp b/pcsx2-libretro/Main.cpp
+index 22ec8a2c7..e34ed8998 100644
+--- a/pcsx2-libretro/Main.cpp
++++ b/pcsx2-libretro/Main.cpp
+@@ -1852,9 +1852,19 @@ RETRO_API bool retro_load_game(const struct retro_game_info* game)
+ 		s_base_settings->SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(GSRendererType::Metal));
+ 		VMManager::Internal::LoadStartupSettings();
+ 	}
+-	if (!LabFrontend::Code.Prepare(environ_cb, HostMemoryMap::CodeSize))
++	LabFrontend::ArenaReport arena_report;
++	const bool arena_ready = LabFrontend::Code.Prepare(environ_cb, HostMemoryMap::CodeSize, &arena_report);
++	log_cb(arena_ready ? RETRO_LOG_INFO : RETRO_LOG_ERROR,
++		"ARMSX2 arena: requested=%zu probe_mode=%u probe_bytes=%zu allocation_mode=%u allocation_bytes=%zu rx=%p rw=%p result=%s\n",
++		static_cast<size_t>(HostMemoryMap::CodeSize), arena_report.probe.mode, arena_report.probe.size,
++		arena_report.allocation.mode, arena_report.allocation.size,
++		arena_report.allocation.rx, arena_report.allocation.rw,
++		arena_report.error ? arena_report.error : "ready");
++	log_cb(RETRO_LOG_INFO, "ARMSX2 paths: root=%s bios=%s resources=%s\n",
++		EmuFolders::AppRoot.c_str(), EmuFolders::Bios.c_str(), EmuFolders::Resources.c_str());
++	if (!arena_ready)
+ 	{
+-		retro_message message{"ARMSX2 requires iOS 26+ with JIT enabled and a 305 MiB RWX/dual-map arena; WX-toggle is unsupported.", 300};
++		retro_message message{arena_report.error, 600};
+ 		environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &message);
+ 		return false;
+ 	}

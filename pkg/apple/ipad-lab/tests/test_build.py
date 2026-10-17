@@ -180,6 +180,23 @@ class PackagingTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Unsupported core build recipe'):
             build.load_lock(path)
 
+    def test_yabause_recipe_builds_in_nested_directory_without_jit(self):
+        repo = self.root / 'yabause'
+        directory = repo / 'yabause/src/libretro'
+        directory.mkdir(parents=True)
+        (directory / 'Makefile').write_text(
+            'all:\n'
+            '\t@test "$(platform)" = "ios-arm64"\n'
+            '\t@test "$(DYNAREC)" = "0"\n'
+            '\t@test "$(USE_PLAY_JIT)" = "0"\n'
+            '\t@printf "%s" "$(MINVERSION)" > yabause_libretro_ios.dylib\n')
+        core = next(c for c in self.lock['cores'] if c['name'] == 'yabause')
+        for version in ('15.0', '17.4'):
+            with self.subTest(minimum_ios=version):
+                binary = build.compile_core(core, repo, self.root, version)
+                self.assertEqual(binary, directory / 'yabause_libretro_ios.dylib')
+                self.assertEqual(binary.read_text(), '-miphoneos-version-min=' + version)
+
     def test_icloud_entitlements_are_isolated_and_follow_lab_identity(self):
         lock = dict(self.lock, bundle_id='com.jamespauley.retroarchlab.test')
         entitlements = build.icloud_entitlements(lock)

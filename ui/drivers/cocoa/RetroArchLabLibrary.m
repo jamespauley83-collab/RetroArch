@@ -396,8 +396,15 @@ bool cocoa_lab_library_visible(void) { return ra_lab_library_visible; }
    if (!core)
    { [self showProblem:@"Assign an installed core to this game or playlist in Advanced. The library will not guess a console from .iso or .chd."]; return; }
    NSString *identifier = RALabCoreIdentifier(core);
+   /* ARMSX2 checks and allocates its required arena in retro_load_game. */
    if (([identifier isEqualToString:@"dolphin"] || [identifier isEqualToString:@"play"]) && !jit_available())
-   { [self showProblem:@"This Lab core needs JIT. Enable JIT for RetroArch Lab with StikDebug, then try again. Other cores may not need JIT."]; return; }
+   {
+      NSBundle *bundle = NSBundle.mainBundle;
+      NSString *name = [bundle objectForInfoDictionaryKey:@"CFBundleDisplayName"] ?: @"this app";
+      [self showProblem:[NSString stringWithFormat:@"This core needs JIT. Enable JIT for %@ (%@) with StikDebug, then try again.",
+            name, bundle.bundleIdentifier ?: @"unknown app ID"]];
+      return;
+   }
    if (!retroarch_ctl(RARCH_CTL_IS_DUMMY_CORE, NULL))
    {
       UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Switch games?"
