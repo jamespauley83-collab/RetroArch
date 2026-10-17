@@ -37,6 +37,13 @@
       "repository": "https://github.com/jpd002/Play-.git",
       "commit": "83700b2c31e593bc94e845b4b31b797be84dda59",
       "recipe": "play-cmake"
+    },
+    {
+      "name": "mednafen_saturn",
+      "system": "Sega Saturn",
+      "repository": "https://github.com/libretro/beetle-saturn-libretro.git",
+      "commit": "faef2779a7568c1734addc4fe63cc76e9fa2566b",
+      "makefile": "Makefile"
     }
   ]
 }

@@ -33,6 +33,9 @@
 #include <defines/cocoa_defines.h>
 
 #include "cocoa_common.h"
+#if defined(HAVE_RETROARCH_LAB_LIBRARY) && TARGET_OS_IOS
+#include "RetroArchLabLibrary.h"
+#endif
 #include "apple_platform.h"
 #include "../ui_cocoa.h"
 #ifdef HAVE_RETROARCH_PLAYLIST_MANAGER
@@ -216,6 +219,14 @@ void rarch_stop_draw_observer(void)
 #if TARGET_OS_IPHONE
    if ([[UIApplication sharedApplication] applicationState] != UIApplicationStateActive)
       return;
+
+#if defined(HAVE_RETROARCH_LAB_LIBRARY) && TARGET_OS_IOS
+   if (cocoa_lab_library_visible())
+   {
+      task_queue_check();
+      return;
+   }
+#endif
 
    int ret = runloop_iterate();
 
@@ -642,9 +653,13 @@ void rarch_stop_draw_observer(void)
 #elif TARGET_OS_IOS
 -(void) showNativeMenu
 {
+#ifdef HAVE_RETROARCH_LAB_LIBRARY
+    cocoa_lab_show_library();
+#else
     dispatch_async(dispatch_get_main_queue(), ^{
         command_event(CMD_EVENT_MENU_TOGGLE, NULL);
     });
+#endif
 }
 
 -(void)toggleCustomKeyboardUsingSwipe:(id)sender {
