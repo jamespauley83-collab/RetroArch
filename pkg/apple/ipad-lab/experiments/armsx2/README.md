@@ -10,7 +10,7 @@ working gameplay. Neither changes Lab's core lock or normal packaging.
 Open the `ARMSX2 iOS core prototype` PR workflow. It checks out ARMSX2 revision
 `e58489d349cdcd635fc6264546087e347c84bf8c`, applies only this directory's patches,
 builds the upstream checksum-verified static iOS dependencies, and compiles the
-root `pcsx2-libretro` target for ARM64/iPhoneOS 17.4. No Apple credentials or
+root `pcsx2-libretro` target for ARM64/iPhoneOS 26.0. No Apple credentials or
 provisioning profiles are used. A fresh source checkout is required per run.
 
 On a Mac with Xcode, check out the same pinned upstream revision at
@@ -32,6 +32,35 @@ dependency source archives/checksums, patches, GPL license, inspection report
 and manifest. Apply the included patches in numeric order to the pinned source archive to
 reconstruct the modified source. Read the manifest's stage and validation
 fields; compilation does not establish runtime compatibility.
+
+## iOS compatibility
+
+ARMSX2 artifacts require **iOS/iPadOS 26.0 or later**, plus working JIT access.
+The core, dependencies, Metal library, test app and optional integrated candidate
+use that deployment target. Ordinary Lab builds without ARMSX2 keep their
+existing minimum OS and core set.
+
+`pkg/apple/JITSupport.m` supplies WX-toggle (mode 3) before iOS 26, and dual
+mappings (mode 4) on iOS 26+. This bridge supports RWX (2) and dual-map (4) only.
+Merely accepting mode 3 would execute the startup probe from RW-only memory.
+The bridge also bypasses `HostSys::BeginCodeWrite`/`EndCodeWrite`, and does not
+register the frontend arena with upstream's legacy protection state. Enabling
+whole-arena mprotect calls would affect other EE/VU threads: upstream's
+`microVU_Branch-arm64.inl` and `iR3000A-arm64.cpp` document overlapping emit
+windows. The legacy path logs protection failures and can continue as if the
+transition succeeded. Safe WX-toggle support needs coordinated page/range
+ownership, checked RW/RX transitions, and a device-tested startup/patch/reset
+path. It is not enabled by this correction; mode 3 remains rejected before
+allocation or VM startup.
+
+Older 17.4-targeted artifacts do not establish pre-26 compatibility. Keep any
+functioning installed app and its data; this change neither installs nor removes
+anything. James reported Need for Speed boot, graphics, audio, controls,
+in-game save/load and reopening/reloading passing on October 16. Device/OS and
+installed revision remain unconfirmed, so that report is not attributed to this
+correction. Automated cache tests check addresses, spans and data-before-instruction
+ordering with stubbed OS primitives; they do not prove ARM64 execution or cache
+coherency on hardware.
 
 ## Implemented bridge (runtime unvalidated)
 
@@ -65,7 +94,10 @@ before VM allocation.
 Native tests check the ABI against Lab’s libretro header and cover rejected allocations, cleanup of malformed replies, exact
 ownership, repeated allocation/release, pixel channel order, frame replacement,
 invalid sizes, clearing and concurrent production/consumption. They do not
-execute generated ARM64 code or exercise Metal. The Darwin map/unmap and
+execute generated ARM64 code or exercise Metal. Memory-mode tests reject mode 3
+in both the probe and allocation reply, cover both supported modes, allocation
+failures and malformed aliases, retry failed releases, and compile the actual
+Apple cache function to verify RW data flush before RX instruction invalidation. The Darwin map/unmap and
 SysMemory reset tests compile those functions directly from the patched source,
 with data-reset calls stubbed; full VM reset remains a device check.
 
@@ -91,7 +123,7 @@ execute/patch/cache preflight, asynchronous boot-error reporting, and offscreen
 Metal initialization without dispatching unnecessary UI work. Its test app uses
 `com.jamespauley.retroarchlab.ps2test`, one core, and no iCloud feature flag or
 entitlements. Packaging verifies app identity, URL scheme, core count and hashes. Both the
-built app and final IPA must declare a minimum iOS version of at least 17.4;
+built app and final IPA must declare a minimum iOS version of at least 26.0;
 missing, malformed or older values fail packaging.
 
 ## Remaining validation

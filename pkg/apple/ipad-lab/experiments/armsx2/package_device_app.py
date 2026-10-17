@@ -15,7 +15,7 @@ import build as lab
 
 BUNDLE_ID = 'com.jamespauley.retroarchlab.ps2test'
 DISPLAY_NAME = 'RetroArch PS2 Test'
-MINIMUM_IOS = '17.4'
+MINIMUM_IOS = '26.0'
 CORE_INFO = '''display_name = "Sony - PlayStation 2 (ARMSX2 Lab Test)"
 corename = "ARMSX2 Lab Test"
 systemname = "PlayStation 2"
@@ -26,7 +26,7 @@ license = "GPLv3"
 permissions = "dynarec"
 supports_no_game = "true"
 firmware_count = 0
-notes = "Experimental device test. Supply your PS2 BIOS under system/pcsx2/bios. Enable JIT before starting."
+notes = "Experimental device test; requires iOS 26+. Supply your PS2 BIOS under system/pcsx2/bios. Enable JIT before starting."
 '''
 
 
@@ -35,6 +35,8 @@ def validate_core_manifest(manifest, binary):
         raise ValueError('Only the explicit device-test core may enter this test app.')
     if manifest.get('architecture') != 'arm64' or manifest.get('platform') != 'iOS':
         raise ValueError('Expected an ARM64 iPhoneOS core.')
+    if manifest.get('minimum_ios') != MINIMUM_IOS:
+        raise ValueError('ARMSX2 core requires an iOS 26.0 deployment target.')
     if hashlib.sha256(binary.read_bytes()).hexdigest() != manifest.get('sha256'):
         raise ValueError('Core checksum differs from its verified manifest.')
 
@@ -51,10 +53,10 @@ def customize_test_plist(path):
 def verify_test_info(info):
     version = info.get('MinimumOSVersion')
     if not isinstance(version, str) or not re.fullmatch(r'[0-9]+(?:\.[0-9]+){0,2}', version):
-        raise ValueError('Test app must declare MinimumOSVersion of iOS 17.4 or later.')
+        raise ValueError('Test app must declare MinimumOSVersion of iOS 26.0 or later.')
     parts = tuple(int(part) for part in version.split('.'))
-    if parts + (0,) * (3 - len(parts)) < (17, 4, 0):
-        raise ValueError('Test app requires iOS 17.4 or later for its Metal shaders.')
+    if parts + (0,) * (3 - len(parts)) < (26, 0, 0):
+        raise ValueError('Test app requires iOS 26.0 or later for its frontend JIT memory mode.')
     if info.get('NSUbiquitousContainers'):
         raise ValueError('Test app must not declare iCloud containers.')
     if info.get('CFBundleIdentifier') != BUNDLE_ID or info.get('CFBundleDisplayName') != DISPLAY_NAME:

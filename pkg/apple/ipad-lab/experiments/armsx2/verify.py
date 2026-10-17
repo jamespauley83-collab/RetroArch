@@ -28,7 +28,7 @@ def validate(architectures, build_version, symbols, dependencies):
     if platforms != ['IOS']:
         raise ValueError('Expected iPhoneOS, not macOS or the simulator.')
     versions = re.findall(r'^\s*minos\s+(\S+)', build_version, re.M)
-    if versions != ['17.4']:
+    if versions != ['26.0']:
         raise ValueError('Unexpected deployment target.')
     exports = set(symbols.split())
     if not {'_' + name for name in REQUIRED}.issubset(exports):
@@ -87,7 +87,7 @@ def main():
         'lab_commit': output('git', '-C', str(here), 'rev-parse', 'HEAD').strip(),
         'stage': args.stage, 'gameplay_enabled': args.stage == 'device-test',
         'device_signed': False, 'device_tested': False,
-        'architecture': 'arm64', 'platform': 'iOS', 'minimum_ios': '17.4',
+        'architecture': 'arm64', 'platform': 'iOS', 'minimum_ios': '26.0',
         'binary': binary.name,
         'sha256': hashlib.sha256(binary.read_bytes()).hexdigest(),
         'patches': {p.name: hashlib.sha256(p.read_bytes()).hexdigest()

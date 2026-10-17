@@ -18,6 +18,11 @@ if [ "$(uname -s)" != Darwin ]; then
     echo 'This experiment requires macOS with the iPhoneOS SDK.' >&2
     exit 1
 fi
+SDK_VERSION="$(xcrun --sdk iphoneos --show-sdk-version)"
+if [ "${SDK_VERSION%%.*}" -lt 26 ]; then
+    echo 'ARMSX2 requires the iOS 26 SDK or later; select Xcode 26 before building.' >&2
+    exit 1
+fi
 mkdir -p "$ARTIFACTS"
 if [ "$(git -C "$SOURCE" rev-parse HEAD)" != "$PIN" ]; then
     echo 'ARMSX2 source does not match the reviewed pin.' >&2
@@ -35,14 +40,14 @@ done
 python3 "$HERE/run_native_tests.py" "$SOURCE" "$ROOT" "$WORK/native-tests"
 
 cd "$SOURCE"
-APPLE_PLATFORM=ios APPLE_DEPLOYMENT_TARGET=17.4 \
+APPLE_PLATFORM=ios APPLE_DEPLOYMENT_TARGET=26.0 \
     bash .github/workflows/scripts/macos/build-dependencies-embedded.sh "$WORK/deps" \
     2>&1 | tee "$WORK/dependencies.log"
 
 cmake -S "$SOURCE" -B "$WORK/build" -G Ninja \
     -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_SYSTEM_PROCESSOR=arm64 \
     -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_SYSROOT=iphoneos \
-    -DCMAKE_OSX_DEPLOYMENT_TARGET=17.4 -DIOS=ON \
+    -DCMAKE_OSX_DEPLOYMENT_TARGET=26.0 -DIOS=ON \
     -DCMAKE_PREFIX_PATH="$WORK/deps" -DCMAKE_FIND_ROOT_PATH="$WORK/deps" \
     -DCMAKE_BUILD_TYPE=Release -DCMAKE_MACOSX_BUNDLE=OFF \
     -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \

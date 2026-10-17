@@ -132,7 +132,7 @@ index 0000000..b4276f3
 +
 +namespace LabFrontend
 +{
-+// RetroArch executable-memory ABI v1. No platform allocation fallback.
++// RetroArch executable-memory ABI v1. No WX-toggle: EE/VU writes can overlap.
 +using Environment = bool (*)(unsigned, void*);
 +struct Allocation
 +{
@@ -284,7 +284,7 @@ index e6ef8fe..4f1f391 100644
 +  set(air "${CMAKE_CURRENT_BINARY_DIR}/lab-metal/${name}.air")
 +  add_custom_command(OUTPUT "${air}"
 +   COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_CURRENT_BINARY_DIR}/lab-metal"
-+   COMMAND xcrun -sdk iphoneos metal -std=ios-metal2.3 -mios-version-min=17.4
++   COMMAND xcrun -sdk iphoneos metal -std=ios-metal2.3 -mios-version-min=26.0
 +    -ffast-math -c "${CMAKE_SOURCE_DIR}/pcsx2/${shader}" -o "${air}"
 +   DEPENDS "${CMAKE_SOURCE_DIR}/pcsx2/${shader}"
 +    "${CMAKE_SOURCE_DIR}/pcsx2/GS/Renderers/Metal/GSMTLShaderCommon.h"
@@ -331,7 +331,7 @@ index 93a1710..94ad295 100644
 +	}
 +	if (!LabFrontend::Code.Prepare(environ_cb, HostMemoryMap::CodeSize))
 +	{
-+		retro_message message{"ARMSX2 needs a frontend RWX or dual-map JIT arena of at least 305 MiB.", 300};
++		retro_message message{"ARMSX2 requires iOS 26+ with JIT enabled and a 305 MiB RWX/dual-map arena; WX-toggle is unsupported.", 300};
 +		environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &message);
 +		return false;
 +	}

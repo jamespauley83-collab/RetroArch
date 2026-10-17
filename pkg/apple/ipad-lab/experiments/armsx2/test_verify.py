@@ -17,7 +17,7 @@ class ArtifactValidation(unittest.TestCase):
     def setUp(self):
         self.report = dict(
             architectures='arm64\n',
-            build_version='      platform IOS\n         minos 17.4\n',
+            build_version='      platform IOS\n         minos 26.0\n',
             symbols='\n'.join('_' + name for name in REQUIRED),
             dependencies='core:\n\t@rpath/armsx2_libretro.dylib (compatibility version 0.0.0)\n'
                          '\t/usr/lib/libc++.1.dylib (compatibility version 1.0.0)\n'
@@ -34,14 +34,14 @@ class ArtifactValidation(unittest.TestCase):
     def test_rejects_simulator_and_macos(self):
         for platform in ['IOSSIMULATOR', 'MACOS', '2', '']:
             with self.subTest(platform=platform):
-                self.report['build_version'] = 'platform ' + platform + '\nminos 17.4\n'
+                self.report['build_version'] = 'platform ' + platform + '\nminos 26.0\n'
                 with self.assertRaises(ValueError):
                     validate(**self.report)
 
     def test_rejects_wrong_deployment(self):
-        self.report['build_version'] = 'platform IOS\nminos 18.0\n'
-        with self.assertRaises(ValueError):
-            validate(**self.report)
+        for version in ('17.4', '18.0', '25.9', '26.1', ''):
+            with self.subTest(version=version), self.assertRaises(ValueError):
+                validate(**dict(self.report, build_version='platform IOS\nminos ' + version + '\n'))
 
     def test_rejects_missing_entry_point(self):
         self.report['symbols'] = self.report['symbols'].replace('_retro_load_game\n', '')

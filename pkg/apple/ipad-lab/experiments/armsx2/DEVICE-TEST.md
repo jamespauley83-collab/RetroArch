@@ -1,16 +1,18 @@
 # RetroArch PS2 Test
 
 This unsigned IPA enables experimental ARMSX2 boot. A successful build proves
-compilation and packaging only. Graphics, audio, input, saves and sustained
-gameplay have not been validated on an iPhone or iPad.
+compilation and packaging only. James reported Need for Speed boot, graphics, audio, controls and in-game
+save/reload passing on October 16. The installed revision and iOS version are
+unconfirmed; the corrected build still needs its own physical-device checks.
 
 ## Signing gate
 
 Use only a replacement artifact whose workflow passed **both** variants and
-whose source includes `0004-exclusive-code-arena.patch`. The October 16 artifact
+whose manifest declares `minimum_ios: 26.0` and includes the corrected patch
+hashes. Earlier artifacts advertising 17.4 do not establish older-iOS support. The October 16 artifact
 from run 38903866768 predates this correction and must not be installed.
 
-1. Confirm the device runs iOS/iPadOS **17.4 or later**. Extract the replacement
+1. Confirm the device runs iOS/iPadOS **26.0 or later**. Extract the replacement
    artifact and retain `build-manifest.json`. Compare the unsigned IPA's SHA-256
    with `ipa_sha256` in that manifest (PowerShell:
    `Get-FileHash .\RetroArch-PS2-Test-unsigned.ipa -Algorithm SHA256`). Signing
@@ -55,7 +57,8 @@ Signing references: [Sideloadly](https://sideloadly.io/),
 5. Enable JIT for **RetroArch PS2 Test** with your existing device setup before
    starting the core. Enabling it for the normal Lab app does not enable it for
    this separate process. This bridge requires a frontend RWX or dual-map arena;
-   unsupported allocation modes produce an error before emulator startup.
+   WX-toggle (mode 3, used by the frontend before iOS 26) is unsupported and
+   produces an error before emulator startup. iOS 26 alone does not enable JIT.
 6. Enable **Settings > Logging > Logging Verbosity** and **Log to File** before
    the first boot. Note the log location under **Settings > Directory > Logs**.
 
@@ -104,7 +107,8 @@ Frame pacing and Metal CPU readback performance remain development work.
 | Memory card | New test-only save, quit, relaunch/JIT, successful reload | Pending |
 
 The native tests exercise the actual Darwin borrow/return functions and the
-memory-reset portion of VM reset with stubbed data resets. They do not execute
+memory-reset portion of VM reset with stubbed data resets, plus supported/rejected
+memory modes and cache-call ordering with stubbed OS cache functions. They do not execute
 the whole VM or ARM64 JIT on the device. Metal remains a fixed 640x448 CPU
 readback baseline; record PAL/aspect behavior separately from allocation bugs.
 Do not transfer test saves back into the working Lab during these checks.
