@@ -75,6 +75,7 @@ class EightCoreTestPackaging(unittest.TestCase):
             package.validate_archive(archive, manifest, isolated=True)
             info = plistlib.loads(archive.read(package.PREFIX + 'Info.plist'))
             self.assertTrue(info['UIFileSharingEnabled'])
+            self.assertTrue(info['LSSupportsOpeningDocumentsInPlace'])
             for name, data in self.entries.items():
                 if '/Frameworks/' in name or name.endswith('/RetroArch'):
                     self.assertEqual(data, archive.read(name))
@@ -82,6 +83,29 @@ class EightCoreTestPackaging(unittest.TestCase):
         self.assertEqual(manifest['derivative']['input_ipa_sha256'], package.sha256(before))
         self.assertEqual(manifest['ipa_sha256'], package.sha256(ipa.read_bytes()))
         self.assertFalse(manifest['device_tested'])
+
+    def test_rejects_test_copy_hidden_from_files(self):
+        self.write_input()
+        ipa = package.package(self.source, self.target)
+        manifest = json.loads((self.target / 'build-manifest.json').read_text())
+        with zipfile.ZipFile(ipa) as archive:
+            entries = {name: archive.read(name) for name in archive.namelist()}
+        for key in ('UIFileSharingEnabled', 'LSSupportsOpeningDocumentsInPlace'):
+            for value in (False, None):
+                with self.subTest(key=key, value=value):
+                    info = plistlib.loads(entries[package.PREFIX + 'Info.plist'])
+                    if value is None:
+                        info.pop(key)
+                    else:
+                        info[key] = value
+                    data = io.BytesIO()
+                    with zipfile.ZipFile(data, 'w') as broken:
+                        for name, content in entries.items():
+                            broken.writestr(name, plistlib.dumps(info)
+                                            if name == package.PREFIX + 'Info.plist' else content)
+                    with zipfile.ZipFile(data) as broken:
+                        with self.assertRaisesRegex(ValueError, 'visible in Files'):
+                            package.validate_archive(broken, manifest, isolated=True)
 
     def test_bad_input_checksum_creates_no_test_copy(self):
         path = self.write_input()

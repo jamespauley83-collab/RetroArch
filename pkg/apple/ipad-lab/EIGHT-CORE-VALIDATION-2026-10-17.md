@@ -4,9 +4,12 @@
 
 The original artifact is an unsigned **update** to the working Lab identity.
 Do not install it for first combined-core testing. A separately identified
-unsigned test copy has been produced and checked locally. Signing/profile
-inspection, iPadOS/model confirmation, backup verification, installation and all
-combined-app physical tests remain pending. PR #12 stays draft.
+unsigned test copy has been produced and checked locally. Sideloadly reported
+installation complete; James reported both apps open and the working library
+is intact. A Files visibility defect in that test package was subsequently
+confirmed and corrected. Installation of this correction, final signed-profile
+inspection, backup verification and combined-app gameplay remain pending.
+PR #12 stays draft.
 
 ## Input and integrity evidence
 
@@ -22,7 +25,8 @@ combined-app physical tests remain pending. PR #12 stays draft.
 | --- | --- |
 | Downloaded GitHub artifact ZIP; matches GitHub's reported digest | `9fdf5c405879517eed4b9f7df8118be33c15888f23090e9cf11fe0736e603c05` |
 | Original unsigned IPA; matches external manifest | `51cc686ef42a15c763028615277ad758bb28ef534d1af01e5ac73947da490028` |
-| Locally derived isolated unsigned IPA | `6cbfae0b60884b57a4a4ecf68b16f9348ab6a20930f11a3f2a1b6ae96edf53af` |
+| Initial isolated unsigned IPA; superseded due to hidden Files folder | `6cbfae0b60884b57a4a4ecf68b16f9348ab6a20930f11a3f2a1b6ae96edf53af` |
+| Corrected isolated unsigned IPA; Files flags enabled | `ff7605ec654490b81abaad91ea75b199167f831819b12b801184fa6dcc2e4fc7` |
 
 The original IPA passed ZIP CRC checking. Its embedded manifest matches the
 external manifest except the expected whole-IPA hash field. All eight final
@@ -60,12 +64,15 @@ must not be assumed. See the [device checklist](EIGHT-CORE-DEVICE-TEST.md).
 
 `RetroArch-Lab-8-Test-unsigned.ipa` uses
 `com.jamespauley.retroarchlab.eightcoretest` and `retroarchlab8test`. The working
-widget and document registrations are removed. Open-in-place is disabled.
+widget and document registrations are removed. Both `UIFileSharingEnabled`
+and `LSSupportsOpeningDocumentsInPlace` are enabled so the test app's Documents
+can appear in Files. This does not grant access to the working cloud container.
 Every retained file apart from Info.plist and the embedded manifest was compared
 byte-for-byte with the original, including the frontend, all cores and MoltenVK.
 The derivative manifest records the original IPA hash and packager source hash.
 
-Eight local safety regression tests pass, covering isolation/preservation,
+Nine local safety regression tests pass, covering Files visibility flags,
+isolation/preservation,
 checksums, missing/extra cores, OS/platform/architecture mismatch, original
 identity/provisioning rejection, universal ARM64/entitlement handling, and
 refusing to overwrite an existing output directory. Python compilation and
@@ -74,8 +81,32 @@ downloaded artifact. No new native build was needed for the unchanged binaries;
 the new workflow packaging step has not yet executed on GitHub Actions.
 
 The existing successful workflow remains automated build evidence. James's
-earlier Need for Speed success applies only to the separate PS2 Test app, with
-device/version/revision unconfirmed. **No combined-app device result is recorded.**
+earlier Need for Speed success applies only to the separate PS2 Test app.
+
+## Device evidence and Files correction
+
+- The Lenovo's Sideloadly reported iPadOS 27.2 and completed installation of
+  the initial isolated IPA. Its bundle ID field was explicitly set to the test
+  ID, automatic bundle ID was off, custom entitlements and injection were off.
+  The signer cache is the unsigned input, not an export of the installed signed
+  app; final signed entitlements/profile have not been independently inspected.
+- James reported both apps open and his original library is intact. This is
+  user-reported launch/coexistence evidence, not a save or iCloud integrity audit.
+- James initially reported Yabause gameplay/audio/controls/save-reload passed,
+  then reported no test-app folder for copying ROMs. Attribution of that result
+  is unresolved; combined-app gameplay and restart tests remain unconfirmed.
+- His 08:12 EDT Files screenshot shows RetroArch, RetroArch Lab and RetroArch
+  PS2 Test, with no RetroArch Lab 8 Test folder. Direct package inspection found
+  `LSSupportsOpeningDocumentsInPlace=false` despite file sharing being enabled.
+  The packager now enables both flags and rejects missing/false flags. Apple
+  documents the pair as required for exposing Documents through the local file
+  provider. Corrected-package Files visibility still needs device confirmation.
+
+Update only the existing eight-core test app with the same signing account and
+test bundle ID. Do not uninstall either app. Preserve original library data and
+settings; use copies in the new test folder for subsequent tests.
+
+Reference: [Apple file-sharing keys](https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/iPhoneOSKeys.html).
 
 The test copy must receive no cloud/app-group entitlements. Its reused cloud
 backend still targets the working Lab container; it is unsuitable for successful

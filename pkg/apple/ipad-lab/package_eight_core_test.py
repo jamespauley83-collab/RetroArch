@@ -128,8 +128,9 @@ def validate_archive(archive, manifest, isolated=False):
             raise ValueError('Test app identifiers are not isolated.')
         if any(key in info for key in ('NSUbiquitousContainers', 'CFBundleDocumentTypes', 'UTExportedTypeDeclarations')):
             raise ValueError('Test app declares cloud or shared document registrations.')
-        if info.get('LSSupportsOpeningDocumentsInPlace') is not False:
-            raise ValueError('Test app must not open external documents in place.')
+        if (info.get('UIFileSharingEnabled') is not True
+                or info.get('LSSupportsOpeningDocumentsInPlace') is not True):
+            raise ValueError('Test app Documents must be visible in Files.')
         if any(name.startswith(PREFIX + 'PlugIns/') for name in names):
             raise ValueError('Test copy must not carry the working app widget.')
         if manifest.get('icloud_drive') != {'enabled': False, 'requires_no_cloud_entitlements': True}:
@@ -161,7 +162,7 @@ def package(artifacts, destination):
         info.update(CFBundleIdentifier=BUNDLE_ID, ALTBundleIdentifier=BUNDLE_ID,
                     CFBundleDisplayName=DISPLAY_NAME, CFBundleName=DISPLAY_NAME,
                     CFBundleURLTypes=[{'CFBundleURLName': BUNDLE_ID, 'CFBundleURLSchemes': [SCHEME]}],
-                    LSSupportsOpeningDocumentsInPlace=False)
+                    UIFileSharingEnabled=True, LSSupportsOpeningDocumentsInPlace=True)
         for key in ('NSUbiquitousContainers', 'CFBundleDocumentTypes', 'UTExportedTypeDeclarations', 'ALTDeviceID'):
             info.pop(key, None)
         replacements = {PREFIX + 'Info.plist': plistlib.dumps(info),

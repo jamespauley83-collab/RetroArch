@@ -15,6 +15,7 @@ below. No device installation or gameplay is established by packaging tests.
 | Widget | Included | Omitted to avoid an additional signing identity |
 | Cloud access | Lab container when provisioned | Must be signed with no iCloud or app-group access |
 | External document registration | Registered file types, open in place | Removed; use copies in the test app's Documents |
+| Local Documents in Files | Enabled | Enabled through both file-sharing plist flags |
 | Runtime | Eight-core iOS 26 candidate | Same frontend, core and MoltenVK bytes before signing |
 
 The cloud backend remains compiled into these reused binaries. Changing the
@@ -80,6 +81,14 @@ playlists, memory cards, states, or directory overrides. Copy one test game and
 BIOS per system into this app's local Documents through Files/file sharing.
 Create new playlist entries pointing to those local copies. An empty initial
 library is expected. Never select the working Lab or its cloud folder as a path.
+
+Open the test app once, then use **Files > Browse > On My iPad > RetroArch Lab
+8 Test**. The initial isolated package disabled `LSSupportsOpeningDocumentsInPlace`
+and hid this folder. The corrected package enables that key together with
+`UIFileSharingEnabled`. These settings expose this app's own Documents; they do
+not grant cloud-container access. Always copy games and BIOS into the test
+folder before loading them. Update the existing test identity with the same
+signing account; do not uninstall either app to apply this packaging correction.
 
 In Advanced, inspect **Settings > Directory** for System/BIOS, Save Files,
 Save States and Logs. Enable **Settings > Saving > Sort Saves into Folders by
