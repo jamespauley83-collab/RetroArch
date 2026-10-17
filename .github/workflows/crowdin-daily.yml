@@ -32,6 +32,10 @@ jobs:
         env:
           CROWDIN_API_KEY: ${{ secrets.CROWDIN_API_KEY }}
         run: |
+          if [ -z "$CROWDIN_API_KEY" ]; then
+            echo "::notice::CROWDIN_API_KEY is not configured; skipping Crowdin sync."
+            exit 0
+          fi
           cd intl
           python3 -m pip install requests PyYAML
           python3 crowdin_sync.py "$CROWDIN_API_KEY"
