@@ -33,7 +33,7 @@ class Armsx2IntegrationTests(unittest.TestCase):
         self.core_manifest = {
             'upstream_commit': 'e58489d349cdcd635fc6264546087e347c84bf8c',
             'lab_commit': self.revision, 'stage': 'device-test', 'gameplay_enabled': True,
-            'architecture': 'arm64', 'platform': 'iOS', 'minimum_ios': '17.4',
+            'architecture': 'arm64', 'platform': 'iOS', 'minimum_ios': '26.0',
             'sha256': hashlib.sha256(self.binary.read_bytes()).hexdigest(), 'patches': hashes,
         }
         self.write_manifest()
@@ -51,7 +51,8 @@ class Armsx2IntegrationTests(unittest.TestCase):
         original = copy.deepcopy(self.core_manifest)
         for field, value in [('lab_commit', 'b' * 40), ('upstream_commit', 'b' * 40),
                              ('stage', 'build-probe'), ('architecture', 'x86_64'),
-                             ('platform', 'macOS'), ('minimum_ios', '15.0'),
+                             ('platform', 'macOS'), ('minimum_ios', '15.0'), ('minimum_ios', '17.4'),
+                             ('minimum_ios', '25.9'),
                              ('gameplay_enabled', False), ('patches', {})]:
             with self.subTest(field=field):
                 self.core_manifest = dict(original, **{field: value})
@@ -103,12 +104,12 @@ class Armsx2IntegrationTests(unittest.TestCase):
         binary.write_bytes(self.binary.read_bytes())
         with zipfile.ZipFile(self.app / 'assets.zip', 'a') as archive:
             archive.writestr('info/armsx2_libretro.info', 'ARMSX2')
-        for version in ('15.0', '17.3.99', '17.4beta', True, ''):
+        for version in ('15.0', '17.4', '25.9', '26beta', '26.0.0.1', True, ''):
             self.info['MinimumOSVersion'] = version
             self.write_info()
             with self.assertRaisesRegex(ValueError, 'ARMSX2 requires'):
                 build.validate_app(self.app, self.lock)
-        self.info['MinimumOSVersion'] = '17.4'
+        self.info['MinimumOSVersion'] = '26.0'
         self.write_info()
         build.validate_app(self.app, self.lock)
         ipa, result = self.package()

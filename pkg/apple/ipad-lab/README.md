@@ -61,7 +61,9 @@ python3 pkg/apple/ipad-lab/build.py --check --with-armsx2
 python3 -u pkg/apple/ipad-lab/build.py --with-armsx2
 ```
 
-This candidate requires **iOS 17.4+**. It retains the seven baseline cores, library,
+This candidate requires **iOS 26.0+ with working JIT access**. Pre-26 frontend
+WX-toggle allocations are rejected; see the [compatibility rationale](experiments/armsx2/README.md#ios-compatibility).
+The ordinary seven-core build without ARMSX2 retains its existing minimum OS. It retains the seven baseline cores, library,
 Lab identity and iCloud configuration, adding ARMSX2 and its source provenance.
 The ordinary build without this option retains the seven-core/iOS 15 baseline.
 The combined app still needs its own build and device validation; the separate

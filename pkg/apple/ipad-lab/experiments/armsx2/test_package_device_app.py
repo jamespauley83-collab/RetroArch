@@ -15,12 +15,13 @@ class DevicePackageValidation(unittest.TestCase):
             binary = Path(directory) / 'core.dylib'
             binary.write_bytes(b'device core fixture')
             manifest = dict(stage='device-test', gameplay_enabled=True,
-                            architecture='arm64', platform='iOS',
+                            architecture='arm64', platform='iOS', minimum_ios='26.0',
                             sha256=hashlib.sha256(binary.read_bytes()).hexdigest())
             validate_core_manifest(manifest, binary)
             for field, value in [('stage', 'build-probe'), ('gameplay_enabled', False),
                                  ('architecture', 'x86_64'), ('platform', 'iOS Simulator'),
-                                 ('sha256', 'incorrect')]:
+                                 ('minimum_ios', '17.4'), ('minimum_ios', '25.9'),
+                                 ('minimum_ios', None), ('sha256', 'incorrect')]:
                 with self.subTest(field=field), self.assertRaises(ValueError):
                     validate_core_manifest(dict(manifest, **{field: value}), binary)
 
@@ -28,7 +29,7 @@ class DevicePackageValidation(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             app = Path(directory)
             info_path = app / 'Info.plist'
-            info_path.write_bytes(plistlib.dumps({'CFBundleIdentifier': BUNDLE_ID, 'MinimumOSVersion': '17.4'}))
+            info_path.write_bytes(plistlib.dumps({'CFBundleIdentifier': BUNDLE_ID, 'MinimumOSVersion': '26.0'}))
             customize_test_plist(info_path)
             frameworks = app / 'Frameworks'
             (frameworks / 'armsx2.libretro.framework').mkdir(parents=True)
@@ -45,7 +46,7 @@ class DevicePackageValidation(unittest.TestCase):
                 with self.subTest(field=field), self.assertRaises(ValueError):
                     verify_isolation(app)
 
-    def test_final_app_and_ipa_require_ios_17_4(self):
+    def test_final_app_and_ipa_require_ios_26(self):
         with tempfile.TemporaryDirectory() as directory:
             app = Path(directory) / 'RetroArch.app'
             (app / 'Frameworks/armsx2.libretro.framework').mkdir(parents=True)
@@ -54,7 +55,8 @@ class DevicePackageValidation(unittest.TestCase):
             customize_test_plist(info_path)
             original = plistlib.loads(info_path.read_bytes())
             for version in [None, '', '15.0', '17', '17.3.99', '17.4beta',
-                            '17.4.0.1', 17.4, True, '17.4', '17.4.0', '17.4.1', '18.0']:
+                            '26.0.0.1', 26.0, True, '17.4', '18.0', '25.9',
+                            '26beta', '26', '26.0', '26.0.0', '26.0.1', '27.0']:
                 with self.subTest(version=version):
                     info = dict(original)
                     if version is not None:
@@ -65,20 +67,20 @@ class DevicePackageValidation(unittest.TestCase):
                         archive.write(info_path, 'Payload/RetroArch.app/Info.plist')
                         archive.writestr('Payload/RetroArch.app/Frameworks/'
                                          'armsx2.libretro.framework/armsx2.libretro', b'fixture')
-                    if version in ('17.4', '17.4.0', '17.4.1', '18.0'):
+                    if version in ('26', '26.0', '26.0.0', '26.0.1', '27.0'):
                         verify_isolation(app)
                         verify_packaged_app(ipa)
                     else:
-                        with self.assertRaisesRegex(ValueError, 'iOS 17.4'):
+                        with self.assertRaisesRegex(ValueError, 'iOS 26.0'):
                             verify_isolation(app)
-                        with self.assertRaisesRegex(ValueError, 'iOS 17.4'):
+                        with self.assertRaisesRegex(ValueError, 'iOS 26.0'):
                             verify_packaged_app(ipa)
 
     def test_final_ipa_rejects_shared_identity_cloud_and_extra_core(self):
         with tempfile.TemporaryDirectory() as directory:
             info_path = Path(directory) / 'Info.plist'
             info_path.write_bytes(plistlib.dumps({'CFBundleIdentifier': BUNDLE_ID,
-                                                  'MinimumOSVersion': '17.4'}))
+                                                  'MinimumOSVersion': '26.0'}))
             customize_test_plist(info_path)
             original = plistlib.loads(info_path.read_bytes())
             for field, value in [('CFBundleIdentifier', 'com.jamespauley.retroarchlab'),

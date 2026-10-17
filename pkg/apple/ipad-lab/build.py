@@ -129,7 +129,7 @@ def armsx2_inputs(root, revision):
     expected = {
         'upstream_commit': 'e58489d349cdcd635fc6264546087e347c84bf8c',
         'lab_commit': revision, 'stage': 'device-test',
-        'architecture': 'arm64', 'platform': 'iOS', 'minimum_ios': '17.4',
+        'architecture': 'arm64', 'platform': 'iOS', 'minimum_ios': '26.0',
     }
     if any(manifest.get(key) != value for key, value in expected.items()):
         raise ValueError('ARMSX2 must be built for this revision with the device-test recipe.')
@@ -231,8 +231,8 @@ def validate_armsx2_os(info):
     if not isinstance(version, str) or not re.fullmatch(r'[0-9]+(?:\.[0-9]+){0,2}', version):
         raise ValueError('ARMSX2 requires a valid app minimum iOS version.')
     parts = tuple(int(part) for part in version.split('.'))
-    if parts + (0,) * (3 - len(parts)) < (17, 4, 0):
-        raise ValueError('ARMSX2 requires iOS 17.4 or later.')
+    if parts + (0,) * (3 - len(parts)) < (26, 0, 0):
+        raise ValueError('ARMSX2 requires iOS 26.0 or later.')
 
 
 def validate_app(app, lock):
@@ -302,7 +302,7 @@ def build(root, with_armsx2=False):
     lock = load_lock(source / LAB / 'cores.lock.json')
     if with_armsx2:
         armsx2_inputs(root, revision)
-        lock['minimum_ios'] = '17.4'
+        lock['minimum_ios'] = '26.0'
     apple = source / 'pkg/apple'
     overlay_core_info(source)
     customize_plist(apple / 'iOS/Info.plist', lock)

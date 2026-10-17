@@ -43,6 +43,9 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+      - name: Select Xcode 26 for ARMSX2
+        if: github.event_name == 'pull_request' || inputs.with_armsx2
+        run: echo 'DEVELOPER_DIR=/Applications/Xcode_26.3.app/Contents/Developer' >> "$GITHUB_ENV"
       - name: Validate build inputs and packaging checks
         run: |
           python3 pkg/apple/ipad-lab/build.py --check
