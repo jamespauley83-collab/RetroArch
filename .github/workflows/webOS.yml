@@ -12,12 +12,25 @@ on:
   repository_dispatch:
     types: [ run_build ]
 
+
 env:
   PACKAGE_NAME: com.retroarch.webos
   ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  lab-scope:
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/ipad-change-scope.yml
+
   build:
+    needs: lab-scope
+    if: ${{ !cancelled() && needs.lab-scope.outputs.build != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
