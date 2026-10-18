@@ -2,7 +2,7 @@
 
 A separate native iOS build for testing emulator-core changes. The first baseline
 includes FCEUmm (NES/Famicom), Snes9x 2010 (SNES), Opera (3DO), Dolphin (GameCube/Wii),
-and Play! (PlayStation 2),
+Play! (PlayStation 2), and Beetle Saturn (Sega Saturn),
 all compiled from source. Opera includes a local startup diagnostic patch.
 This is an initial development build, not a confirmed fix for any game.
 
@@ -62,6 +62,42 @@ in-game saving, restarting, and loading that save.
 Device signing, installation, and real iPad gameplay must still be verified.
 This build does not automatically enable JIT. Dolphin needs a separate JIT setup
 for practical performance, and Play! requires it to start a game; see below.
+
+## Sega Saturn setup
+
+This build includes **Sega - Saturn (Beetle Saturn)**, compiled from the pinned
+`mednafen_saturn` source. Its iOS ARM64 implementation uses the interpreter;
+StikDebug/JIT is not required for this core. Game performance still needs to be
+checked on the device. Start with the core defaults and leave experimental JIT
+options alone; the pinned core's JIT backends do not support iOS ARM64.
+
+1. Install this IPA as an update using the same Lab identity, signing account,
+   and custom iCloud entitlements as the existing app. Keep your saves backed up.
+2. In Lab, check **Settings > Directory > System/BIOS**. Copy your BIOS files
+   directly into that directory using Files. Lab has its own sandbox; BIOS files
+   in the original RetroArch app are not automatically available here.
+
+   | Region | Filename | MD5 |
+   | --- | --- | --- |
+   | North America / Europe | `mpr-17933.bin` | `3240872c70984b6cbfda1586cab68dbe` |
+   | Japan | `sega_101.bin` | `85ec9ca47d8f6807718151cbcca8b964` |
+
+3. Select **Load Core > Sega - Saturn (Beetle Saturn)**, then check
+   **Information > Core Information** for the required firmware. The extra
+   cartridge ROMs listed there are only needed for their named games.
+4. Use **Load Content** to open a `.chd`, or a `.cue` stored alongside all of
+   its referenced `.bin` tracks. Extract ZIP/7z archives first. Select the `.cue`,
+   not an individual `.bin` track. `.m3u`, `.ccd`, and `.toc` are also supported.
+5. Test one game with the existing video driver and default core settings.
+   Check picture, audio and controls, then make an in-game save. Close the
+   content normally, reopen Lab, and confirm the save loads. Report the game,
+   region and FPS if it runs slowly before changing global settings.
+
+No BIOS or game files are supplied. The ordinary Saturn saves (`.bkr`, `.bcr`,
+`.smpc`) use RetroArch's configured Save directory; save states use its State
+directory. Verify any desired cloud sync separately.
+
+Reference: [Libretro Beetle Saturn documentation](https://docs.libretro.com/library/beetle_saturn/).
 
 ## Change a core
 
