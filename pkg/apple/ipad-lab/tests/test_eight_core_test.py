@@ -142,6 +142,31 @@ class EightCoreTestPackaging(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     package.package(self.source, self.target)
 
+    def test_rejects_an_additional_payload_app(self):
+        self.entries['Payload/Other.app/Other'] = macho()
+        self.write_input()
+        with self.assertRaisesRegex(ValueError, 'Unexpected archive paths'):
+            package.package(self.source, self.target)
+        self.assertFalse(self.target.exists())
+
+    def test_rejects_unlisted_frameworks_and_loose_libraries(self):
+        for index, path in enumerate(('Other.framework/Other', 'injected.dylib')):
+            with self.subTest(path=path):
+                self.target = self.root / ('test-copy-' + str(index))
+                entry = package.PREFIX + 'Frameworks/' + path
+                self.entries[entry] = macho()
+                self.write_input()
+                with self.assertRaisesRegex(ValueError, 'Framework inventory'):
+                    package.package(self.source, self.target)
+                self.assertFalse(self.target.exists())
+                del self.entries[entry]
+
+    def test_accepts_explicit_archive_directory_entries(self):
+        for path in ('Payload/', package.PREFIX, package.PREFIX + 'Frameworks/'):
+            self.entries[path] = b''
+        self.write_input()
+        package.package(self.source, self.target)
+
     def test_rejects_wrong_identity_and_signed_inputs(self):
         self.info['CFBundleIdentifier'] = 'com.example.other'
         self.write_input()

@@ -76,7 +76,8 @@ def validate_archive(archive, manifest, isolated=False):
     names = archive.namelist()
     if len(names) != len(set(names)):
         raise ValueError('Duplicate archive entries.')
-    if any(not name.startswith('Payload/') or '..' in PurePosixPath(name).parts for name in names):
+    if any((name != 'Payload/' and not name.startswith(PREFIX))
+           or '..' in PurePosixPath(name).parts for name in names):
         raise ValueError('Unexpected archive paths.')
     if archive.testzip() is not None:
         raise ValueError('Archive CRC failure.')
@@ -96,8 +97,9 @@ def validate_archive(archive, manifest, isolated=False):
     if len(manifest['cores']) != 8 or {core['name'] for core in manifest['cores']} != CORES:
         raise ValueError('Expected exactly eight named cores.')
     expected = {core['name'].replace('_', '.') + '.libretro.framework' for core in manifest['cores']}
+    expected.add('MoltenVK.framework')
     actual = {name[len(PREFIX + 'Frameworks/'):].split('/')[0] for name in names
-              if name.startswith(PREFIX + 'Frameworks/') and '.libretro.framework/' in name}
+              if name.startswith(PREFIX + 'Frameworks/') and name != PREFIX + 'Frameworks/'}
     if actual != expected:
         raise ValueError('Framework inventory differs from the manifest.')
     binaries = {PREFIX + 'RetroArch': archive.read(PREFIX + 'RetroArch')}

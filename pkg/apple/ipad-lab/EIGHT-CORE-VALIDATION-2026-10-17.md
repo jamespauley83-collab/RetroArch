@@ -1,5 +1,11 @@
 # Eight-core artifact inspection — October 17, 2026
 
+This is the historical October 17 artifact record. Build 42 and later installed
+signing/backup evidence supersede its pending-status statements; see the
+[October 18 release assessment](EIGHT-CORE-RELEASE-REVIEW-2026-10-18.md) and
+[current device record](EIGHT-CORE-DEVICE-TEST.md). Do not repeat completed tests
+from this older snapshot.
+
 ## Decision
 
 The original artifact is an unsigned **update** to the working Lab identity.

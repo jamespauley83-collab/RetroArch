@@ -1,5 +1,12 @@
 # RetroArch Lab 8 Test — isolated iPad acceptance
 
+**Current decision:** keep PR #12 draft. See the
+[October 18 release assessment](EIGHT-CORE-RELEASE-REVIEW-2026-10-18.md) for the
+completed evidence, remaining gates and new Yabause save-state correction.
+That correction needs a future targeted build; do not use build 42's Yabause
+save states to validate it. Historical procedures below are not requests to
+repeat completed PS2/Saturn gameplay, save/restart, switching or lifecycle tests.
+
 Do not install `RetroArch-Lab-unsigned.ipa` from the original eight-core artifact
 over the working Lab. It has the same app identity and iCloud configuration.
 Use the derived **RetroArch-Lab-8-Test-unsigned.ipa** only after the signing gate
@@ -199,8 +206,9 @@ PS2 gameplay/save/restart pass and the remaining evidence gaps.
 
 Record app revision from the manifest, package SHA, iPad model/OS, signer/final
 ID, JIT method, BIOS region, exact game edition/title ID, and controller used.
-James's earlier Need for Speed result belongs to the separate PS2 Test app;
-repeat it here and identify the edition. Use in-game saves as the primary test.
+James's earlier Need for Speed result belongs to the separate PS2 Test app.
+The October 18 continuation records the subsequent combined-app pass; do not
+repeat it solely to reconfirm. Use in-game saves as the primary test.
 
 | Order | Test | Pass evidence |
 | --- | --- | --- |
@@ -252,20 +260,19 @@ the Files-Fix package; the later build 42 update and smoke test are recorded bel
 | Check | Current evidence |
 | --- | --- |
 | Working Lab coexistence | Initially, James reported both apps open and the original library is intact. The later build 42 follow-up below adds a user-reported original-library and known-save pass; all-save integrity and cloud behavior remain unverified. |
-| Yabause in Lab 8 Test | Saturn gameplay confirmed by James; October 18 switching report confirms its save, sound and controls survived three round trips. Exact save path and Yabause persistence after full app restart remain unrecorded. |
+| Yabause in Lab 8 Test | Saturn gameplay confirmed by James; October 18 switching report confirms its save, sound and controls survived three round trips. The later USB inspection establishes its save path. Yabause persistence after full app restart remains unrecorded. |
 | ARMSX2 in Lab 8 Test | Game launch recovered after the app-specific StikDebug `universal.js` retry. |
 | ARMSX2 sustained session | James reports the guided gameplay test passed on October 18. Exact duration and per-check measurements were not provided; no measured 15-minute result is claimed. |
-| Fresh PS2 memory-card save | Passed by James's October 18 report: saving and reload after restart in Lab 8 Test. Actual card path/files and saved-progress identifier remain unrecorded. |
+| Fresh PS2 memory-card save | Passed by James's October 18 report: saving and reload after restart in Lab 8 Test. The later USB inspection establishes both card paths/files; the exact saved-progress identifier remains unrecorded. |
 | ARMSX2/Yabause switching | Passed by James's October 18 report: all three requested round trips passed, with both saves, sound and controls intact. No restart/JIT recovery or failure was reported. NES/SNES-inclusive switching from the broader checklist is not established. |
 | Actual iPad save locations | Confirmed by October 18 USB inspection: `Documents/RetroArch/system/pcsx2/memcards/Mcd001.ps2` and `Mcd002.ps2`; `Documents/RetroArch/saves/Yabause/Alien Trilogy (US).srm`. Copied and hash-verified; see the backup section below. |
-| Latest JIT source correction | Build 42 compiled the correction and its unsigned package was verified. James reports the guided update and PS2/Yabause launch with existing saves; see the build 42 section below. Signed output remains uninspected. |
+| Latest JIT source correction | Build 42 compiled the correction and its unsigned package was verified. James reports the guided update and PS2/Yabause launch with existing saves. Later USB metadata verifies installed signing scope; exported signed-binary cryptographic verification remains open. |
 
 ### PS2 procedure used for the reported pass
 
-Use the currently installed **RetroArch Lab 8 Test**; no rebuild or reinstall
-is needed for these checks. Keep working Lab, PS2 Test, their games/saves and
-iCloud configuration unchanged. Use only fresh local test data, with test-app
-cloud sync off.
+The following is the historical procedure for the reported PS2 pass, not a new
+test request. It used **RetroArch Lab 8 Test**, with working Lab, PS2 Test,
+their games/saves and iCloud configuration unchanged, and test-app cloud sync off.
 
 1. Read **Advanced > Settings > Directory > System/BIOS** and **Save Files**;
    do not change them. Verify they belong to this test app. If a path points
@@ -302,8 +309,9 @@ James answered the three-round switching question: **"All three passed; both
 saves, sound, and controls stayed intact."** This records a user-reported pass
 for the following same-process sequence in Lab 8 Test, without independently
 observed logs or file inspection. Preserve that result and do not repeat the
-completed rounds solely to reconfirm them. Actual System/BIOS, memory-card and
-Yabause save-folder screenshots are still needed.
+completed rounds solely to reconfirm them. The later USB inspection establishes
+the System/BIOS, memory-card and Yabause save paths directly; screenshots are no
+longer a prerequisite for that evidence.
 
 The guided procedure was normal Close Content between
 **ARMSX2 -> Yabause -> ARMSX2**, three rounds in one test-app process. Reuse
@@ -320,9 +328,10 @@ first relevant logs before retrying or overwriting a failing save; paired
 StikDebug/RetroArch logs are needed if the launch error returns. No new defect
 is established until an observed failure is reported.
 
-Keep PR #12 draft. In addition to these results, the existing checklist still
-tracks signed-output isolation, backup verification, device/build details,
-remaining lifecycle/core comparisons and working-app regression evidence.
+Keep PR #12 draft. Later entries below establish backup verification,
+device/build details, installed signing scope and lifecycle recovery. The
+[release assessment](EIGHT-CORE-RELEASE-REVIEW-2026-10-18.md) identifies the
+remaining signed-binary, core/renderer, state and working-app cloud gates.
 This session does not change working-app data to exercise cloud sync. Candidate
 cloud acceptance requires a future dedicated test-container build; this
 repackaged app must never receive working-container cloud entitlements.
