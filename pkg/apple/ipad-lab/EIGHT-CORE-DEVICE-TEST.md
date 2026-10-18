@@ -193,7 +193,9 @@ and ARMSX2 now runs a game in Lab 8 Test after the app-specific script retry.
 Keep these observations separate from automated tests and the standalone PS2
 Test pass. The ARMSX2 launch symptom is resolved by user report; sustained
 graphics/audio/controls, fresh save/reload after restart, core switching and
-working-app/iCloud regression still need their own evidence.
+working-app/iCloud regression still need their own evidence. This is the
+October 17 baseline; the October 18 continuation below records the subsequent
+PS2 gameplay/save/restart pass and the remaining evidence gaps.
 
 Record app revision from the manifest, package SHA, iPad model/OS, signer/final
 ID, JIT method, BIOS region, exact game edition/title ID, and controller used.
@@ -235,21 +237,30 @@ cleanup option after exporting any desired test evidence; do not uninstall Lab.
 
 ## October 18 acceptance continuation
 
-Evidence carried forward from James's October 17 reports and PR #12; no new
-physical-device result is claimed by this documentation update.
+Evidence carried forward from James's October 17 reports and PR #12, followed
+by his October 18 acceptance response: **"Gameplay, saving, and reload after
+restart all passed."** This response was explicitly to the Lab 8 Test PS2
+session, so it establishes user-reported gameplay and fresh in-game memory-card
+save/reload after a full app restart in the combined app. It is not borrowed
+from the standalone PS2 Test result. The guided session included graphics,
+audio, controls and pause/resume; James reported the overall pass without
+separate measurements. Exact duration, game/edition, controller, resolution,
+card filenames/paths and screenshots were not supplied. Do not claim a measured
+15-minute run or independently inspected card files. No new build was installed
+by this workflow, and the uninstalled JIT correction remains unvalidated.
 
 | Check | Current evidence |
 | --- | --- |
 | Working Lab coexistence | James reported both apps open and the original library is intact. Save/cloud integrity is not established by that observation. |
 | Yabause in Lab 8 Test | Saturn gameplay confirmed by James. Retain this result; do not repeat basic boot solely to reconfirm it. Exact save path and restart/switch persistence remain unrecorded. |
 | ARMSX2 in Lab 8 Test | Game launch recovered after the app-specific StikDebug `universal.js` retry. |
-| ARMSX2 sustained session | Pending: duration, graphics, audio, controls and pause/resume in this combined app. |
-| Fresh PS2 memory-card save | Pending: identifiable new in-game progress, normal Close Content, actual card path/files and reload after full app restart. Standalone PS2 Test results do not satisfy this check. |
+| ARMSX2 sustained session | James reports the guided gameplay test passed on October 18. Exact duration and per-check measurements were not provided; no measured 15-minute result is claimed. |
+| Fresh PS2 memory-card save | Passed by James's October 18 report: saving and reload after restart in Lab 8 Test. Actual card path/files and saved-progress identifier remain unrecorded. |
 | ARMSX2/Yabause switching | Pending: three same-process round trips with normal Close Content, no crash/stale audio/input, correct core assignment and both saves retained. Include NES/SNES in the broader checklist above if local test content is already available. |
 | Actual iPad save locations | Pending device observation. Expected ARMSX2 path: `<configured System/BIOS>/pcsx2/memcards`; expected Yabause: configured frontend Save Files directory, with any active core/game subfolders. |
 | Latest JIT source correction | Not in the installed Files-Fix package. Recovery is not validation of `b0a26e4`; targeted iPhoneOS compilation and device verification remain pending. |
 
-### Next session: PS2 persistence before switching
+### PS2 procedure used for the reported pass
 
 Use the currently installed **RetroArch Lab 8 Test**; no rebuild or reinstall
 is needed for these checks. Keep working Lab, PS2 Test, their games/saves and
@@ -285,7 +296,11 @@ cloud sync off.
    iPadOS and build identity when available; do not infer them from an older
    installer log. Redact private container UUIDs in any public evidence.
 
-After PS2 restart persistence passes, use normal Close Content between
+### Next session: core switching and save-location evidence
+
+The PS2 restart-persistence result is now recorded by user report; do not repeat
+the full session solely to reconfirm it. Obtain the actual System/BIOS and
+memory-card folder screenshots separately. Use normal Close Content between
 **ARMSX2 -> Yabause -> ARMSX2**, three rounds in one test-app process. Reuse
 the proven Saturn game for switching rather than repeating its full acceptance
 session. Verify the intended core and sound/input each time, load the new PS2
