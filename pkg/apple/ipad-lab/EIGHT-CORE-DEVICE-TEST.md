@@ -251,7 +251,7 @@ the Files-Fix package; the later build 42 update and smoke test are recorded bel
 
 | Check | Current evidence |
 | --- | --- |
-| Working Lab coexistence | James reported both apps open and the original library is intact. Save/cloud integrity is not established by that observation. |
+| Working Lab coexistence | Initially, James reported both apps open and the original library is intact. The later build 42 follow-up below adds a user-reported original-library and known-save pass; all-save integrity and cloud behavior remain unverified. |
 | Yabause in Lab 8 Test | Saturn gameplay confirmed by James; October 18 switching report confirms its save, sound and controls survived three round trips. Exact save path and Yabause persistence after full app restart remain unrecorded. |
 | ARMSX2 in Lab 8 Test | Game launch recovered after the app-specific StikDebug `universal.js` retry. |
 | ARMSX2 sustained session | James reports the guided gameplay test passed on October 18. Exact duration and per-check measurements were not provided; no measured 15-minute result is claimed. |
@@ -368,11 +368,29 @@ installed binary was not independently read back. This result does not
 reassign the earlier sustained gameplay, fresh-save/restart or three-round
 switching results to build 42, nor establish all games, cores or iCloud sync.
 
+### Lifecycle recovery and working-Lab follow-up
+
+At 11:56 AM America/New_York on October 18, James answered **"yes"** when
+asked whether these two guided checks passed:
+
+1. In each PS2 and Saturn game, switch apps and return, then lock/unlock the
+   iPad, confirming sound and controls recover.
+2. Open the original RetroArch Lab and confirm its library and a known save
+   still work.
+
+Record both checks as **passed by user report** after the guided build 42
+update. This adds background/foreground and lock/unlock sound/input recovery
+for the two tested games, plus a working-Lab library/known-save regression
+pass. No failure, crash or missing save was reported. The response does not
+establish same-core save-state recovery, other core/renderer transitions,
+independently inspected signed output, a verified backup, all saves or iCloud
+sync behavior.
+
 Remaining release evidence: signed-output isolation, verified backup and actual
-save paths/screenshots; background/foreground and lock/unlock recovery;
-remaining core/renderer transitions and working-Lab save/cloud regression.
-Keep PR #12 draft and test-app cloud sync off. Do not repeat the completed
-launch/save-load check solely to reconfirm it.
+save paths/screenshots; remaining core/renderer and save-state checks; and
+working-Lab cloud regression. Keep PR #12 draft and test-app cloud sync off.
+Do not repeat the completed launch/save-load, lifecycle recovery or
+working-Lab library/known-save checks solely to reconfirm them.
 
 ## Reproduce the unsigned test copy
 
