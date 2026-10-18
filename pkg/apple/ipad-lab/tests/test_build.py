@@ -154,6 +154,32 @@ class PackagingTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'core info is missing'):
             build.validate_app(self.app, self.lock)
 
+    def test_dolphin_system_archive_has_installable_layout(self):
+        sys_dir = self.root / 'dolphin/Data/Sys'
+        (sys_dir / 'GameSettings').mkdir(parents=True)
+        (sys_dir / 'codehandler.bin').write_bytes(b'handler')
+        (sys_dir / 'GameSettings/example.ini').write_text('[Core]\n')
+        artifacts = self.root / 'artifacts'
+        artifacts.mkdir()
+        record = build.package_dolphin_system(self.root / 'dolphin', artifacts)
+        archive_path = artifacts / record['file']
+        with zipfile.ZipFile(archive_path) as archive:
+            self.assertEqual(archive.read('dolphin-emu/Sys/codehandler.bin'), b'handler')
+            self.assertEqual(archive.read('dolphin-emu/Sys/GameSettings/example.ini'), b'[Core]\n')
+        self.assertEqual(record['sha256'], hashlib.sha256(archive_path.read_bytes()).hexdigest())
+
+    def test_missing_dolphin_system_files_stop_packaging(self):
+        with self.assertRaisesRegex(ValueError, 'system files are missing'):
+            build.package_dolphin_system(self.root, self.root)
+
+    def test_unknown_recipe_is_rejected(self):
+        lock = copy.deepcopy(self.lock)
+        lock['cores'][0]['recipe'] = 'unknown'
+        path = self.root / 'lock.json'
+        path.write_text(json.dumps(lock))
+        with self.assertRaisesRegex(ValueError, 'Unsupported core build recipe'):
+            build.load_lock(path)
+
 
 if __name__ == '__main__':
     unittest.main()
