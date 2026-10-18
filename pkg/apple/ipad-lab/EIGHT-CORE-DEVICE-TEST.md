@@ -388,8 +388,9 @@ sync behavior.
 
 The subsequent USB inspection below records actual save paths, a verified
 file-copy backup and installed signing metadata. Remaining release evidence
-includes correcting test-app keychain scope, exported signed-binary validation,
-remaining core/renderer and save-state checks, and working-Lab cloud regression.
+includes exported signed-binary validation, remaining core/renderer and
+save-state checks, and working-Lab cloud regression. The later re-sign check
+below resolves the test-app keychain scope.
 Keep PR #12 draft and test-app cloud sync off.
 Do not repeat the completed launch/save-load, lifecycle recovery or
 working-Lab library/known-save checks solely to reconfirm them.
@@ -434,7 +435,7 @@ Working Lab reports cloud sync enabled with driver `icloud_drive`, with
 destructive sync off. These settings were read without modification; they do
 not establish a fresh cross-device cloud-sync test.
 
-### Installed signing: partial pass, keychain scope fails
+### Installed signing before correction: keychain scope failed
 
 The iPad's installation service reports:
 
@@ -471,6 +472,40 @@ profile wildcards into fully qualified signed entitlements:
 and [TN2415](https://developer.apple.com/library/archive/technotes/tn2415/).
 The observed groups fail this project's isolation gate; no cross-app keychain
 access or loss of saves was tested or observed. Keep PR #12 draft.
+
+### Scoped re-sign verified at 12:26 PM
+
+James reported **"done"** after the guided Sideloadly update using
+`Lab8-Test-Scoped.entitlements.plist`. A fresh USB inspection at
+2026-10-18 16:26 UTC verified that the installed app's entitlements exactly
+match that prepared file:
+
+- The separate bundle/application identifier and signing team remain correct.
+- `keychain-access-groups` now contains only
+  `<team>.com.jamespauley.retroarchlab.eightcoretest`; the wildcard and
+  `com.apple.token` entries are absent.
+- `get-task-allow = true` and device-reported `ProfileValidated = true`.
+- No iCloud, ubiquity or app-group entitlements are present.
+
+**The installed keychain-scope check is now passed.** This supersedes the
+earlier failed scope check and the "not installed" status of the prepared
+entitlement file. It is direct installed-metadata evidence, not merely the
+requested signing configuration.
+
+All eight save files selected from the private backup summary still match
+their pre-update SHA-256 values: both test PS2 memory cards, its Saturn save
+and five saved-data files in working Lab. This focused comparison does not
+claim that every one of the 5,428 backed-up files was re-read after signing.
+Working Lab remains installed with its cloud entitlements. Its configuration
+still enables `icloud_drive`; test configuration still disables cloud sync.
+No device files or cloud settings were modified during verification.
+
+No fresh post-re-sign gameplay was observed. Use the established app-specific
+StikDebug `universal.js` setup before the next PS2 launch as needed. Existing
+gameplay reports remain attributed to their earlier sessions. Exported signed
+executable/framework verification, restore testing, remaining core/renderer
+checks and fresh working-app cloud-sync acceptance remain separate. Keep PR
+#12 draft; no merge or working-app replacement was performed.
 
 ## Reproduce the unsigned test copy
 
