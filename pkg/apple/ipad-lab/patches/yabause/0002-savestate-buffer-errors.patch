@@ -1,0 +1,50 @@
+diff --git a/yabause/src/libretro/libretro.c b/yabause/src/libretro/libretro.c
+--- a/yabause/src/libretro/libretro.c
++++ b/yabause/src/libretro/libretro.c
+@@ -626,18 +626,28 @@
+ 
+ bool retro_serialize(void *data, size_t size)
+ {
+-   void *buffer;
+-   size_t out_size;
++   void *buffer = NULL;
++   size_t out_size = 0;
++   int error;
++
++   if (data == NULL || size == 0)
++      return false;
+ 
+    ScspMuteAudio(SCSP_MUTE_SYSTEM);
+-   int error = YabSaveStateBuffer (&buffer, &out_size);
++   error = YabSaveStateBuffer(&buffer, &out_size);
+    ScspUnMuteAudio(SCSP_MUTE_SYSTEM);
+ 
+-   memcpy(data, buffer, size);
+-
++   if (error || buffer == NULL || out_size == 0 || out_size > size)
++   {
++      free(buffer);
++      return false;
++   }
++
++   memcpy(data, buffer, out_size);
++   memset((char *)data + out_size, 0, size - out_size);
+    free(buffer);
+ 
+-   return !error;
++   return true;
+ }
+ 
+ bool retro_unserialize(const void *data, size_t size)
+diff --git a/yabause/src/memory.c b/yabause/src/memory.c
+--- a/yabause/src/memory.c
++++ b/yabause/src/memory.c
+@@ -1386,7 +1386,7 @@
+       status = YabSaveStateStream(buffer);
+    }
+ 
+-   return 0;
++   return status;
+ }
+ 
+ //////////////////////////////////////////////////////////////////////////////

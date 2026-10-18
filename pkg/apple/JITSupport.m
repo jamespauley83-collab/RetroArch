@@ -259,9 +259,13 @@ static void *create_rw_mirror(void *rx, size_t size)
                                (vm_address_t)rx, FALSE,
                                &cur, &max, VM_INHERIT_DEFAULT);
    if (kr != KERN_SUCCESS)
+   {
+      RARCH_ERR("[JIT] RW mirror vm_remap failed: bytes=%zu kern_return=%d\n", size, kr);
       return NULL;
+   }
    if (mprotect((void *)rw, size, PROT_READ | PROT_WRITE) != 0)
    {
+      RARCH_ERR("[JIT] RW mirror mprotect failed: bytes=%zu errno=%d\n", size, errno);
       vm_deallocate(mach_task_self(), rw, size);
       return NULL;
    }
@@ -294,12 +298,16 @@ static bool exec_mem_pool_create(void)
    void *rx = mmap(NULL, size, PROT_READ | PROT_EXEC,
                    MAP_ANON | MAP_PRIVATE, -1, 0);
    if (rx == MAP_FAILED)
+   {
+      RARCH_ERR("[JIT] Pool RX mmap failed: bytes=%zu errno=%d\n", size, errno);
       return false;
+   }
 
    /* TXM devices need the debugger to bless executable pages. Non-TXM devices
     * can mmap R-X freely with CS_DEBUGGED */
    if (device_has_txm() && !bless_executable_region(rx, size))
    {
+      RARCH_ERR("[JIT] Pool TXM blessing failed: bytes=%zu; debugger did not handle prepare-region\n", size);
       munmap(rx, size);
       return false;
    }
@@ -584,6 +592,9 @@ bool exec_mem_alloc(size_t *size, unsigned *mode, void **rx, void **rw)
 #if TARGET_OS_SIMULATOR
    return false;
 #else
+   RARCH_LOG("[JIT] app=%s pid=%d requested=%zu pool_remaining=%zu\n",
+             [[[NSBundle mainBundle] bundleIdentifier] UTF8String], getpid(),
+             *size, s_pool_size - s_pool_used);
    exec_mem_pool_init();
 
    if (s_pool_rx)
@@ -615,7 +626,10 @@ bool exec_mem_alloc(size_t *size, unsigned *mode, void **rx, void **rw)
    }
 
    if (!jb_has_debugger_attached())
+   {
+      RARCH_WARN("[JIT] No prepared pool or CS_DEBUGGED for this process; activate JIT for the app ID above\n");
       return false;
+   }
 
    bool dual = requires_dual_map();
 
@@ -636,10 +650,14 @@ bool exec_mem_alloc(size_t *size, unsigned *mode, void **rx, void **rw)
       void *ptr_rx = mmap(NULL, *size, PROT_READ | PROT_EXEC,
                           MAP_ANON | MAP_PRIVATE, -1, 0);
       if (ptr_rx == MAP_FAILED)
+      {
+         RARCH_ERR("[JIT] Arena RX mmap failed: bytes=%zu errno=%d\n", *size, errno);
          return false;
+      }
 
       if (device_has_txm() && !bless_executable_region(ptr_rx, *size))
       {
+         RARCH_ERR("[JIT] Arena TXM blessing failed: bytes=%zu; debugger did not handle prepare-region\n", *size);
          munmap(ptr_rx, *size);
          return false;
       }

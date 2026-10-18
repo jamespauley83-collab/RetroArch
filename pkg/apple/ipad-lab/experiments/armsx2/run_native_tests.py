@@ -23,7 +23,8 @@ def main():
         function(darwin, 'void* DarwinMisc::MmapCodeDualMap(size_t size)') +
         function(darwin, 'void DarwinMisc::MunmapCodeDualMap(void* rx_ptr, size_t size)') +
         function(memory, 'void SysMemory::Reset()'))
-    for test in ['gate_test', 'bridge_test', 'darwin_memory_test', 'memory_mode_test']:
+    for test in ['gate_test', 'bridge_test', 'darwin_memory_test', 'memory_mode_test',
+                 'launch_diagnostics_test']:
         binary = work / test
         subprocess.run(['c++', '-std=c++17', '-Wall', '-Wextra', '-Werror', '-pthread',
                         '-I' + str(source / '3rdparty/libretro'),

@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import plistlib
 import shutil
+import subprocess
 import tempfile
 import unittest
 from unittest import mock
@@ -179,6 +180,74 @@ class PackagingTests(unittest.TestCase):
         path.write_text(json.dumps(lock))
         with self.assertRaisesRegex(ValueError, 'Unsupported core build recipe'):
             build.load_lock(path)
+
+    def test_yabause_recipe_builds_in_nested_directory_without_jit(self):
+        repo = self.root / 'yabause'
+        directory = repo / 'yabause/src/libretro'
+        directory.mkdir(parents=True)
+        (directory / 'Makefile').write_text(
+            'all:\n'
+            '\t@test "$(platform)" = "ios-arm64"\n'
+            '\t@test "$(DYNAREC)" = "0"\n'
+            '\t@test "$(USE_PLAY_JIT)" = "0"\n'
+            '\t@printf "%s" "$(MINVERSION)" > yabause_libretro_ios.dylib\n')
+        core = next(c for c in self.lock['cores'] if c['name'] == 'yabause')
+        for version in ('15.0', '17.4'):
+            with self.subTest(minimum_ios=version):
+                binary = build.compile_core(core, repo, self.root, version)
+                self.assertEqual(binary, directory / 'yabause_libretro_ios.dylib')
+                self.assertEqual(binary.read_text(), '-miphoneos-version-min=' + version)
+
+    def test_yabause_zlib_patch_keeps_fdopen_out_of_apple_sdk_headers(self):
+        compiler = shutil.which('cc')
+        if not compiler:
+            self.skipTest('C compiler is unavailable')
+        header = self.root / 'yabause/src/libchdr/deps/zlib-1.2.11/zutil.h'
+        header.parent.mkdir(parents=True)
+        # zutil.h's classic Mac block from libretro/yabause 8926b0c6c347f8c5c755911ddb0ac695420ffbf8.
+        # The two opening guards stand in for the preceding platform branches.
+        header.write_text(
+            '#if 1\n'
+            '#if 1\n'
+            '#  endif\n'
+            '#endif\n'
+            '\n'
+            '#if defined(MACOS) || defined(TARGET_OS_MAC)\n'
+            '#  define OS_CODE  7\n'
+            '#  ifndef Z_SOLO\n'
+            '#    if defined(__MWERKS__) && __dest_os != __be_os && __dest_os != __win32_os\n'
+            '#      include <unix.h> /* for fdopen */\n'
+            '#    else\n'
+            '#      ifndef fdopen\n'
+            '#        define fdopen(fd,mode) NULL /* No fdopen() */\n'
+            '#      endif\n'
+            '#    endif\n'
+            '#  endif\n'
+            '#endif\n')
+        source = self.root / 'check_fdopen.c'
+        source.write_text(
+            '#include <stddef.h>\n'
+            '#ifndef TARGET_OS_MAC\n'
+            '#define TARGET_OS_MAC 1\n'
+            '#endif\n'
+            '#ifndef __APPLE__\n'
+            '#define __APPLE__ 1\n'
+            '#endif\n'
+            '#include "yabause/src/libchdr/deps/zlib-1.2.11/zutil.h"\n'
+            '#ifdef fdopen\n'
+            '#error "zlib fdopen macro leaked"\n'
+            '#endif\n'
+            '#include <stdio.h>\n'
+            'int main(void) { return 0; }\n')
+        # Prove the probe rejects the original bug, independently of host stdio.h.
+        original = subprocess.run([compiler, '-fsyntax-only', str(source)],
+                                  cwd=self.root, capture_output=True, text=True)
+        self.assertNotEqual(original.returncode, 0)
+        self.assertIn('zlib fdopen macro leaked', original.stderr)
+        patch = (build.ROOT / build.LAB / 'patches/yabause/0001-darwin-zlib-platform.patch')
+        build.run('git', 'apply', '--check', patch, cwd=self.root)
+        build.run('git', 'apply', patch, cwd=self.root)
+        build.run(compiler, '-fsyntax-only', source, cwd=self.root)
 
     def test_icloud_entitlements_are_isolated_and_follow_lab_identity(self):
         lock = dict(self.lock, bundle_id='com.jamespauley.retroarchlab.test')

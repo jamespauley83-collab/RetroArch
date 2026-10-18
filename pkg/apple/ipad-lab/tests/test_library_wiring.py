@@ -58,6 +58,17 @@ class LibraryWiringTests(unittest.TestCase):
         self.assertIn('getGamesFromPlaylist:g_defaults.content_history', source)
         self.assertIn('getGamesFromPlaylist:g_defaults.content_favorites', source)
 
+    def test_armsx2_uses_core_arena_check_instead_of_generic_library_jit_gate(self):
+        source = read('ui/drivers/cocoa/RetroArchLabLibrary.m')
+        launch = source.split('NSString *identifier = RALabCoreIdentifier(core);')[1]
+        gate = launch.split('if (!retroarch_ctl')[0]
+        self.assertIn('!jit_available()', gate)
+        self.assertIn('@"dolphin"', gate)
+        self.assertIn('@"play"', gate)
+        self.assertNotIn('@"armsx2"', gate)
+        self.assertIn('CFBundleDisplayName', gate)
+        self.assertIn('bundle.bundleIdentifier', gate)
+
     def test_artwork_uses_entry_database_even_without_regular_playlist(self):
         source = read('ui/drivers/cocoa/RetroArchLabLibrary.m')
         reload = source.split('- (void)reloadLibrary')[1].split('- (void)filterLibrary')[0]

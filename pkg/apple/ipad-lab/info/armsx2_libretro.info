@@ -1,0 +1,11 @@
+display_name = "Sony - PlayStation 2 (ARMSX2 Lab - Recommended)"
+corename = "ARMSX2 Lab"
+systemname = "PlayStation 2"
+systemid = "ps2"
+manufacturer = "Sony"
+supported_extensions = "elf|iso|ciso|chd|cso|zso|bin|mdf|nrg|dump|gz|img|irx|m3u"
+license = "GPLv3"
+permissions = "dynarec"
+supports_no_game = "true"
+firmware_count = 0
+notes = "Preferred Lab PS2 core; compatibility varies by game. Supply your PS2 BIOS under system/pcsx2/bios. Enable JIT before starting."

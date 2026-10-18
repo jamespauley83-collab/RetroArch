@@ -2,7 +2,7 @@
 
 A separate native iOS build for testing emulator-core changes. The first baseline
 includes FCEUmm (NES/Famicom), Snes9x 2010 (SNES), Opera (3DO), Dolphin (GameCube/Wii),
-Play! (PlayStation 2), and Beetle Saturn (Sega Saturn),
+Play! (PlayStation 2), Beetle Saturn and Yabause (Sega Saturn),
 all compiled from source. Opera includes a local startup diagnostic patch.
 This is an initial development build, not a confirmed fix for any game.
 
@@ -40,6 +40,73 @@ The build checks those hashes against the completed IPA. The embedded
 `build-manifest.json` also includes `ipa_sha256` for the whole archive.
 Verify these before device signing, which can change the executable bytes.
 
+## ARMSX2 integration candidate
+
+**For first physical-device testing, use the separate
+[eight-core test copy](EIGHT-CORE-DEVICE-TEST.md).** The original
+`RetroArch-Lab-unsigned.ipa` uses the working Lab identity and is an update, not
+a side-by-side test install. The workflow now also produces an `eight-core-test`
+subfolder with `RetroArch-Lab-8-Test-unsigned.ipa`, a separate identifier and no
+widget. Sign it without cloud/app-group entitlements and use fresh local copies.
+The standalone `package_eight_core_test.py` can derive it from an already
+verified artifact without recompiling emulator code. Successful candidate cloud
+sync is deferred to a dedicated-container build; do not authorize this test copy
+to access the working Lab container.
+
+ARMSX2 is the recommended PS2 core for the optional eight-core candidate. On
+October 16, 2026, James reported that Need for Speed passed game boot, graphics,
+sound, controls, in-game save/load, and reopening/reloading in **RetroArch PS2
+Test**, and performed much better than Play!. The exact game edition, device/OS,
+and installed build revision were not recorded. This is a user-reported result
+for one game, not a benchmark or acceptance of every subsequent build.
+
+On October 17, James also reported that a game now runs through ARMSX2 in
+**RetroArch Lab 8 Test** after assigning `universal.js` to that app and retrying.
+This records launch recovery in the combined app; its save/reload and
+core-switching checks remain separate. See the
+[launch investigation](PS2-LAUNCH-INVESTIGATION-2026-10-17.md) for the failure
+stage, source comparison and evidence limits.
+
+Pull requests run the eight-core candidate build. For a manual run, use
+**RetroArch Lab iPad** with `with_armsx2` enabled on this integration branch.
+The workflow builds the corrected ARMSX2 device-test core from the same revision
+before adding it to the normal Lab app. For a local Mac build, prepare a fresh
+`.armsx2-prototype/source` checkout at the pin in the experiment workflow, then:
+
+```sh
+bash pkg/apple/ipad-lab/experiments/armsx2/build.sh device-test
+python3 pkg/apple/ipad-lab/build.py --check --with-armsx2
+python3 -u pkg/apple/ipad-lab/build.py --with-armsx2
+```
+
+This candidate requires **iOS 26.0+ with working JIT access**. Pre-26 frontend
+WX-toggle allocations are rejected; see the [compatibility rationale](experiments/armsx2/README.md#ios-compatibility).
+The ordinary seven-core build without ARMSX2 retains its existing minimum OS. It retains the seven baseline cores, library,
+Lab identity and iCloud configuration, adding ARMSX2 and its source provenance.
+The ordinary build without this option retains the seven-core/iOS 15 baseline.
+The combined app still needs its own build and device validation; the separate
+PS2 Test app result does not validate combined-app lifecycle or iCloud behavior.
+
+For isolated testing, extract the supplied `ARMSX2-system-files.zip` into
+**RetroArch Lab 8 Test**'s configured System/BIOS directory and copy your PS2 BIOS
+into its `pcsx2/bios` subfolder. Enable JIT for that exact app,
+`com.jamespauley.retroarchlab.eightcoretest`, with its assigned `universal.js`;
+activation for working Lab or PS2 Test does not activate this process.
+In Advanced, choose **Sony - PlayStation 2 (ARMSX2 Lab - Recommended)** and assign
+it to the local test games you want to use from the library. Existing Play!
+assignments are not rewritten; Play! remains a fallback.
+
+The current source delegates ARMSX2 validation to its own mode 2/4 arena check
+for both launch routes; Dolphin and Play! retain the generic Library JIT gate.
+The existing Files-Fix IPA predates this correction and the new failure
+diagnostics. A targeted iPhoneOS build is still required to validate those source
+changes; the reported launch recovery is not a test of that unbuilt code.
+
+Keep the working PS2 Test app and its saves. This build does not migrate its
+sandbox, convert Play! memory cards, or establish ARMSX2 iCloud save coverage.
+Use copied test data first and verify saving/reloading and switching between
+ARMSX2 and a non-PS2 core in the combined app.
+
 ## Install and test
 
 The IPA is **not device-signed and cannot be installed directly**. Its embedded
@@ -62,6 +129,33 @@ in-game saving, restarting, and loading that save.
 Device signing, installation, and real iPad gameplay must still be verified.
 This build does not automatically enable JIT. Dolphin needs a separate JIT setup
 for practical performance, and Play! requires it to start a game; see below.
+
+## Yabause Saturn option
+
+Yabause is included at upstream revision
+`8926b0c6c347f8c5c755911ddb0ac695420ffbf8`, using the upstream ARM64 iOS Makefile
+with both dynamic recompilers disabled and the app's deployment target. It uses
+software rendering and does not require StikDebug/JIT. James requested Yabause
+as his preferred Saturn option; performance in this Lab build is still pending
+physical-device comparison. Beetle Saturn remains installed and existing Saturn
+playlist assignments stay unchanged.
+
+1. Put a copy of your Saturn BIOS in Lab's System/BIOS directory named
+   `saturn_bios.bin`. Preserve the originals used by Beetle Saturn. A real BIOS
+   is recommended and is required for multi-disc `.m3u` playback.
+2. In Advanced, choose **Load Core > Sega - Saturn (Yabause)** and load a `.chd`
+   or `.cue` with all referenced binary tracks. Assign Yabause explicitly to the
+   desired playlist entries to launch them from the native library.
+3. Use separate per-core save/state folders for comparison. Yabause writes its
+   own `<content-name>.srm` in the configured Save directory; Beetle uses its
+   own formats. Do not rename or convert Beetle saves or reuse its save states.
+4. Test graphics, audio, input, pause/resume, normal content close, and an in-game
+   save followed by app restart/reload. Compare the same game/scene against
+   Beetle. Keep normal close-content in the test: Yabause owns backup-RAM file
+   writes rather than exposing SRAM through RetroArch's memory callbacks.
+
+No BIOS or game files are included. See the
+[upstream Yabause documentation](https://docs.libretro.com/library/yabause/).
 
 ## Sega Saturn setup
 
@@ -242,3 +336,4 @@ Linux x86-64 additionally executes generated and patched code in the harness.
 
 References: [Play! source and iOS instructions](https://github.com/jpd002/Play-),
 [Libretro Play! documentation](https://docs.libretro.com/library/play/).
+
