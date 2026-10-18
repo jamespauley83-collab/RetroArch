@@ -257,7 +257,7 @@ the Files-Fix package; the later build 42 update and smoke test are recorded bel
 | ARMSX2 sustained session | James reports the guided gameplay test passed on October 18. Exact duration and per-check measurements were not provided; no measured 15-minute result is claimed. |
 | Fresh PS2 memory-card save | Passed by James's October 18 report: saving and reload after restart in Lab 8 Test. Actual card path/files and saved-progress identifier remain unrecorded. |
 | ARMSX2/Yabause switching | Passed by James's October 18 report: all three requested round trips passed, with both saves, sound and controls intact. No restart/JIT recovery or failure was reported. NES/SNES-inclusive switching from the broader checklist is not established. |
-| Actual iPad save locations | Pending device observation. Expected ARMSX2 path: `<configured System/BIOS>/pcsx2/memcards`; expected Yabause: configured frontend Save Files directory, with any active core/game subfolders. |
+| Actual iPad save locations | Confirmed by October 18 USB inspection: `Documents/RetroArch/system/pcsx2/memcards/Mcd001.ps2` and `Mcd002.ps2`; `Documents/RetroArch/saves/Yabause/Alien Trilogy (US).srm`. Copied and hash-verified; see the backup section below. |
 | Latest JIT source correction | Build 42 compiled the correction and its unsigned package was verified. James reports the guided update and PS2/Yabause launch with existing saves; see the build 42 section below. Signed output remains uninspected. |
 
 ### PS2 procedure used for the reported pass
@@ -386,11 +386,91 @@ establish same-core save-state recovery, other core/renderer transitions,
 independently inspected signed output, a verified backup, all saves or iCloud
 sync behavior.
 
-Remaining release evidence: signed-output isolation, verified backup and actual
-save paths/screenshots; remaining core/renderer and save-state checks; and
-working-Lab cloud regression. Keep PR #12 draft and test-app cloud sync off.
+The subsequent USB inspection below records actual save paths, a verified
+file-copy backup and installed signing metadata. Remaining release evidence
+includes correcting test-app keychain scope, exported signed-binary validation,
+remaining core/renderer and save-state checks, and working-Lab cloud regression.
+Keep PR #12 draft and test-app cloud sync off.
 Do not repeat the completed launch/save-load, lifecycle recovery or
 working-Lab library/known-save checks solely to reconfirm them.
+
+## October 18 USB backup and installed-signing inspection
+
+After James connected the iPad to the Lenovo, read-only USB services reported
+model `iPad15,3`, iPadOS `27.2`, and both distinct Lab bundle identifiers.
+No app installation, uninstall, device-file write or cloud-setting change was
+performed in this inspection.
+
+### Save-copy verification
+
+A dated private backup was created on the Lenovo for **Lab 8 Test and the
+original working Lab**, with separate app directories. It contains 5,428 files
+(61,694,455 uncompressed bytes): 2,723 from Lab 8 Test and 2,705 from working Lab.
+The 22,116,272-byte ZIP contains those files plus the manifest, summary and
+recovery notes. All source-to-local SHA-256 comparisons passed, with zero
+reported transfer errors. Files under configured save/state and PS2 memory-card
+directories also matched a second source read. ZIP CRC checks and SHA-256
+comparison of every archived data file against the manifest passed.
+
+Scope: existing local saves, states, configuration, playlists, the complete
+test `system/pcsx2` directory, Dolphin data and existing Play Data Files.
+Game images, disc-audio tracks and ROM archives mixed into configuration
+directories were excluded and enumerated privately. The test app has no
+`Documents/Play Data Files`; working Lab has no `system/pcsx2`. These are
+recorded absences, not failed transfers. The backup is per-file, not an atomic
+device snapshot or a full iCloud/keychain/app backup. No restore into either
+app was performed, so restore acceptance remains separate.
+
+The test's inspected configuration points to its own local
+`Documents/RetroArch/system`, `saves`, `states`, `config` and `playlists`.
+Actual PS2 cards `system/pcsx2/memcards/Mcd001.ps2` and `Mcd002.ps2` are each
+8,650,752 bytes. The Saturn file is
+`saves/Yabause/Alien Trilogy (US).srm`, 65,536 bytes. These files were copied and
+hash-verified. Their contents were not interpreted to independently establish
+in-game progress; the earlier user-reported save-load result remains separate.
+
+Test configuration reports `cloud_sync_enable = false` and driver `null`.
+Working Lab reports cloud sync enabled with driver `icloud_drive`, with
+destructive sync off. These settings were read without modification; they do
+not establish a fresh cross-device cloud-sync test.
+
+### Installed signing: partial pass, keychain scope fails
+
+The iPad's installation service reports:
+
+- Test bundle ID `com.jamespauley.retroarchlab.eightcoretest`; its application
+  identifier and team match that identity.
+- `ProfileValidated = true` and `get-task-allow = true`.
+- No `com.apple.developer.icloud-*`, `com.apple.developer.ubiquity-*` or
+  `com.apple.security.application-groups` entitlements in the installed test app.
+- **Keychain groups are `<team>.*` and `com.apple.token`, rather than only the
+  test application identifier. This fails the test-only keychain requirement.**
+
+Three installed provisioning profiles match the test application identifier.
+All list this iPad, permit debugging, lack cloud/app-group rights and are
+unexpired as of October 18, 2026. Their expirations fall on October 17–18, 2027.
+This profile inventory does not uniquely identify the profile embedded in the
+installed app. No exported signed IPA was available for independent
+cryptographic validation of its executable/framework signatures or binary
+comparison to the CI output. Device-reported entitlements are stronger
+evidence than the previous unsigned-cache inspection, but do not satisfy
+those remaining checks.
+
+A private `Lab8-Test-Scoped.entitlements.plist` candidate was prepared beside
+the verified build 42 IPA. It preserves the observed application identifier,
+team and debugging permission, limits `keychain-access-groups` to that exact
+test identifier, and contains no cloud/app-group rights. Its plist round-trip
+and scope assertions passed. It has **not** been applied, signed or installed.
+The next signing step is to use the scoped values when re-signing the same test
+identity, then re-read the resulting entitlements; do not assume a signer
+honors the requested values. Preserve working Lab and existing saves.
+
+Apple documents app-specific default keychain access and the expansion of
+profile wildcards into fully qualified signed entitlements:
+[Keychain sharing](https://developer.apple.com/documentation/security/sharing-access-to-keychain-items-among-a-collection-of-apps)
+and [TN2415](https://developer.apple.com/library/archive/technotes/tn2415/).
+The observed groups fail this project's isolation gate; no cross-app keychain
+access or loss of saves was tested or observed. Keep PR #12 draft.
 
 ## Reproduce the unsigned test copy
 
