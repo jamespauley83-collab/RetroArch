@@ -233,6 +233,80 @@ whether the failure survives a fresh app launch. Do not repeatedly reuse or
 overwrite a failing save. Uninstalling only this separate test app is a later
 cleanup option after exporting any desired test evidence; do not uninstall Lab.
 
+## October 18 acceptance continuation
+
+Evidence carried forward from James's October 17 reports and PR #12; no new
+physical-device result is claimed by this documentation update.
+
+| Check | Current evidence |
+| --- | --- |
+| Working Lab coexistence | James reported both apps open and the original library is intact. Save/cloud integrity is not established by that observation. |
+| Yabause in Lab 8 Test | Saturn gameplay confirmed by James. Retain this result; do not repeat basic boot solely to reconfirm it. Exact save path and restart/switch persistence remain unrecorded. |
+| ARMSX2 in Lab 8 Test | Game launch recovered after the app-specific StikDebug `universal.js` retry. |
+| ARMSX2 sustained session | Pending: duration, graphics, audio, controls and pause/resume in this combined app. |
+| Fresh PS2 memory-card save | Pending: identifiable new in-game progress, normal Close Content, actual card path/files and reload after full app restart. Standalone PS2 Test results do not satisfy this check. |
+| ARMSX2/Yabause switching | Pending: three same-process round trips with normal Close Content, no crash/stale audio/input, correct core assignment and both saves retained. Include NES/SNES in the broader checklist above if local test content is already available. |
+| Actual iPad save locations | Pending device observation. Expected ARMSX2 path: `<configured System/BIOS>/pcsx2/memcards`; expected Yabause: configured frontend Save Files directory, with any active core/game subfolders. |
+| Latest JIT source correction | Not in the installed Files-Fix package. Recovery is not validation of `b0a26e4`; targeted iPhoneOS compilation and device verification remain pending. |
+
+### Next session: PS2 persistence before switching
+
+Use the currently installed **RetroArch Lab 8 Test**; no rebuild or reinstall
+is needed for these checks. Keep working Lab, PS2 Test, their games/saves and
+iCloud configuration unchanged. Use only fresh local test data, with test-app
+cloud sync off.
+
+1. Read **Advanced > Settings > Directory > System/BIOS** and **Save Files**;
+   do not change them. Verify they belong to this test app. If a path points
+   into iCloud or another app, stop before making a save.
+2. Use the already working ARMSX2 game and app-specific JIT setup. Play for
+   **15 minutes** as the next focused acceptance interval; note the actual
+   duration, game/edition, graphics, audio, buttons/sticks, pause/resume,
+   slowdown, heat and any failure. Preserve the existing settings and record
+   resolution; do not silently count a higher-resolution test as a 1x test.
+3. Create a new in-game memory-card save with recognizable progress or a
+   unique profile/slot, without overwriting valued data. A RetroArch save state
+   is not evidence for this check. Wait for the game's save indicator to finish,
+   then use **Quick Menu > Close Content** so the core can flush its files.
+4. In **Files > On My iPad > RetroArch Lab 8 Test**, follow the configured
+   System/BIOS path to `pcsx2/memcards`. Record actual card filenames and their
+   modified times/sizes where shown; retain a screenshot with the folder path.
+   A folder's existence alone does not establish which card was written.
+   Do not move, rename, delete or replace cards, or change a directory to match
+   the expected path. If the folder is missing, pause and inspect configuration.
+5. Reopen the game and load the new progress. Close Content normally again,
+   fully quit only this test app, then relaunch and reactivate StikDebug
+   `universal.js` for `com.jamespauley.retroarchlab.eightcoretest` as needed.
+   Load through the game's own Load/Continue function and verify the same
+   progress after the new process starts. Merely resuming a suspended game or
+   loading a RetroArch state does not pass restart persistence.
+6. Report which step passed/failed, actual paths/card names, game/profile or
+   saved progress, controller and session duration. Record iPad model/current
+   iPadOS and build identity when available; do not infer them from an older
+   installer log. Redact private container UUIDs in any public evidence.
+
+After PS2 restart persistence passes, use normal Close Content between
+**ARMSX2 -> Yabause -> ARMSX2**, three rounds in one test-app process. Reuse
+the proven Saturn game for switching rather than repeating its full acceptance
+session. Verify the intended core and sound/input each time, load the new PS2
+save on every return, and verify a disposable Saturn in-game save after leaving
+and returning to Yabause. Inspect the actual `.srm` beneath the configured
+Save Files directory. Record any required app restart or JIT reactivation as
+part of the switching result; recovery after a restart does not turn the failed
+same-process transition into a pass.
+
+Stop on a crash, missing/corrupt save or recurring arena error. Preserve the
+first relevant logs before retrying or overwriting a failing save; paired
+StikDebug/RetroArch logs are needed if the launch error returns. No new defect
+is established until an observed failure is reported.
+
+Keep PR #12 draft. In addition to these results, the existing checklist still
+tracks signed-output isolation, backup verification, device/build details,
+remaining lifecycle/core comparisons and working-app regression evidence.
+This session does not change working-app data to exercise cloud sync. Candidate
+cloud acceptance requires a future dedicated test-container build; this
+repackaged app must never receive working-container cloud entitlements.
+
 ## Reproduce the unsigned test copy
 
 From a verified artifact directory containing the original IPA and manifest:

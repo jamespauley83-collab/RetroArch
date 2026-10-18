@@ -7,9 +7,12 @@ Do not install it for first combined-core testing. A separately identified
 unsigned test copy has been produced and checked locally. Sideloadly reported
 installation complete; James reported both apps open and the working library
 is intact. A Files visibility defect in that test package was subsequently
-confirmed and corrected. Installation of this correction, final signed-profile
-inspection, backup verification and combined-app gameplay remain pending.
-PR #12 stays draft.
+confirmed and corrected. PR #12 subsequently records successful installation of the correction,
+Saturn gameplay in Lab 8 Test, and ARMSX2 launch recovery after the app-specific
+StikDebug `universal.js` retry. Final signed-profile inspection, backup
+verification and the remaining combined-app acceptance checks are still pending.
+The launch recovery does not validate the later uninstalled JIT source changes.
+PR #12 stays draft; see the [current device evidence](EIGHT-CORE-DEVICE-TEST.md#october-18-acceptance-continuation).
 
 ## Input and integrity evidence
 
@@ -93,8 +96,15 @@ earlier Need for Speed success applies only to the separate PS2 Test app.
 - James reported both apps open and his original library is intact. This is
   user-reported launch/coexistence evidence, not a save or iCloud integrity audit.
 - James initially reported Yabause gameplay/audio/controls/save-reload passed,
-  then reported no test-app folder for copying ROMs. Attribution of that result
-  is unresolved; combined-app gameplay and restart tests remain unconfirmed.
+  then reported no test-app folder for copying ROMs. Attribution of that early
+  full result remains unresolved. His later report explicitly confirms Saturn
+  gameplay in Lab 8 Test; retain that result without inferring restart/save-path
+  coverage from the ambiguous earlier report.
+- PR #12 records the Files-Fix installation retry completed with **Done, 100%**.
+  James later confirmed ARMSX2 runs after the app-specific `universal.js` retry.
+  These supersede the earlier installation/gameplay uncertainty, but do not
+  establish sustained PS2 play, card persistence, switching or post-update Files
+  visibility. No fresh inspection of the installed signed binary is claimed.
 - His 08:12 EDT Files screenshot shows RetroArch, RetroArch Lab and RetroArch
   PS2 Test, with no RetroArch Lab 8 Test folder. Direct package inspection found
   `LSSupportsOpeningDocumentsInPlace=false` despite file sharing being enabled.
