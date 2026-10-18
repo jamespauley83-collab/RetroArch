@@ -252,11 +252,11 @@ by this workflow, and the uninstalled JIT correction remains unvalidated.
 | Check | Current evidence |
 | --- | --- |
 | Working Lab coexistence | James reported both apps open and the original library is intact. Save/cloud integrity is not established by that observation. |
-| Yabause in Lab 8 Test | Saturn gameplay confirmed by James. Retain this result; do not repeat basic boot solely to reconfirm it. Exact save path and restart/switch persistence remain unrecorded. |
+| Yabause in Lab 8 Test | Saturn gameplay confirmed by James; October 18 switching report confirms its save, sound and controls survived three round trips. Exact save path and Yabause persistence after full app restart remain unrecorded. |
 | ARMSX2 in Lab 8 Test | Game launch recovered after the app-specific StikDebug `universal.js` retry. |
 | ARMSX2 sustained session | James reports the guided gameplay test passed on October 18. Exact duration and per-check measurements were not provided; no measured 15-minute result is claimed. |
 | Fresh PS2 memory-card save | Passed by James's October 18 report: saving and reload after restart in Lab 8 Test. Actual card path/files and saved-progress identifier remain unrecorded. |
-| ARMSX2/Yabause switching | Pending: three same-process round trips with normal Close Content, no crash/stale audio/input, correct core assignment and both saves retained. Include NES/SNES in the broader checklist above if local test content is already available. |
+| ARMSX2/Yabause switching | Passed by James's October 18 report: all three requested round trips passed, with both saves, sound and controls intact. No restart/JIT recovery or failure was reported. NES/SNES-inclusive switching from the broader checklist is not established. |
 | Actual iPad save locations | Pending device observation. Expected ARMSX2 path: `<configured System/BIOS>/pcsx2/memcards`; expected Yabause: configured frontend Save Files directory, with any active core/game subfolders. |
 | Latest JIT source correction | Not in the installed Files-Fix package. Recovery is not validation of `b0a26e4`; targeted iPhoneOS compilation and device verification remain pending. |
 
@@ -296,11 +296,16 @@ cloud sync off.
    iPadOS and build identity when available; do not infer them from an older
    installer log. Redact private container UUIDs in any public evidence.
 
-### Next session: core switching and save-location evidence
+### Switching procedure and remaining save-location evidence
 
-The PS2 restart-persistence result is now recorded by user report; do not repeat
-the full session solely to reconfirm it. Obtain the actual System/BIOS and
-memory-card folder screenshots separately. Use normal Close Content between
+James answered the three-round switching question: **"All three passed; both
+saves, sound, and controls stayed intact."** This records a user-reported pass
+for the following same-process sequence in Lab 8 Test, without independently
+observed logs or file inspection. Preserve that result and do not repeat the
+completed rounds solely to reconfirm them. Actual System/BIOS, memory-card and
+Yabause save-folder screenshots are still needed.
+
+The guided procedure was normal Close Content between
 **ARMSX2 -> Yabause -> ARMSX2**, three rounds in one test-app process. Reuse
 the proven Saturn game for switching rather than repeating its full acceptance
 session. Verify the intended core and sound/input each time, load the new PS2
