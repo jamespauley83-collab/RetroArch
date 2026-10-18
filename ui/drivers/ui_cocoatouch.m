@@ -28,6 +28,9 @@
 #include <defines/cocoa_defines.h>
 
 #include "cocoa/cocoa_common.h"
+#if defined(HAVE_RETROARCH_LAB_LIBRARY) && TARGET_OS_IOS
+#include "cocoa/RetroArchLabLibrary.h"
+#endif
 #include "cocoa/apple_platform.h"
 #ifdef HAVE_RETROARCH_PLAYLIST_MANAGER
 #import "cocoa/RetroArchPlaylistManager.h"
@@ -1116,6 +1119,11 @@ bool cocoa_audio_session_begin_record(unsigned preferred_rate,
 
    rarch_main(argc, argv, NULL);
 
+#if defined(HAVE_RETROARCH_LAB_LIBRARY) && TARGET_OS_IOS
+   if (retroarch_ctl(RARCH_CTL_IS_DUMMY_CORE, NULL))
+      cocoa_lab_show_library();
+#endif
+
 #ifdef HAVE_KSCRASH
    [self processKSCrashReports];
 #endif
@@ -1502,7 +1510,10 @@ bool cocoa_audio_session_begin_record(unsigned preferred_rate,
    }
 
    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 1.0 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-         command_event(CMD_EVENT_AUDIO_START, NULL);
+#if defined(HAVE_RETROARCH_LAB_LIBRARY) && TARGET_OS_IOS
+         if (!cocoa_lab_library_visible())
+#endif
+            command_event(CMD_EVENT_AUDIO_START, NULL);
          });
 }
 

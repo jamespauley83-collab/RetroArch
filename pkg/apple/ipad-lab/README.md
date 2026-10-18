@@ -1,7 +1,8 @@
 # RetroArch Lab for iPad
 
 A separate native iOS build for testing emulator-core changes. The first baseline
-includes FCEUmm (NES/Famicom), Snes9x 2010 (SNES), Opera (3DO), and Dolphin (GameCube/Wii),
+includes FCEUmm (NES/Famicom), Snes9x 2010 (SNES), Opera (3DO), Dolphin (GameCube/Wii),
+Play! (PlayStation 2), and Beetle Saturn (Sega Saturn),
 all compiled from source. Opera includes a local startup diagnostic patch.
 This is an initial development build, not a confirmed fix for any game.
 
@@ -60,7 +61,43 @@ in-game saving, restarting, and loading that save.
 
 Device signing, installation, and real iPad gameplay must still be verified.
 This build does not automatically enable JIT. Dolphin needs a separate JIT setup
-for practical performance; see the Dolphin instructions below.
+for practical performance, and Play! requires it to start a game; see below.
+
+## Sega Saturn setup
+
+This build includes **Sega - Saturn (Beetle Saturn)**, compiled from the pinned
+`mednafen_saturn` source. Its iOS ARM64 implementation uses the interpreter;
+StikDebug/JIT is not required for this core. Game performance still needs to be
+checked on the device. Start with the core defaults and leave experimental JIT
+options alone; the pinned core's JIT backends do not support iOS ARM64.
+
+1. Install this IPA as an update using the same Lab identity, signing account,
+   and custom iCloud entitlements as the existing app. Keep your saves backed up.
+2. In Lab, check **Settings > Directory > System/BIOS**. Copy your BIOS files
+   directly into that directory using Files. Lab has its own sandbox; BIOS files
+   in the original RetroArch app are not automatically available here.
+
+   | Region | Filename | MD5 |
+   | --- | --- | --- |
+   | North America / Europe | `mpr-17933.bin` | `3240872c70984b6cbfda1586cab68dbe` |
+   | Japan | `sega_101.bin` | `85ec9ca47d8f6807718151cbcca8b964` |
+
+3. Select **Load Core > Sega - Saturn (Beetle Saturn)**, then check
+   **Information > Core Information** for the required firmware. The extra
+   cartridge ROMs listed there are only needed for their named games.
+4. Use **Load Content** to open a `.chd`, or a `.cue` stored alongside all of
+   its referenced `.bin` tracks. Extract ZIP/7z archives first. Select the `.cue`,
+   not an individual `.bin` track. `.m3u`, `.ccd`, and `.toc` are also supported.
+5. Test one game with the existing video driver and default core settings.
+   Check picture, audio and controls, then make an in-game save. Close the
+   content normally, reopen Lab, and confirm the save loads. Report the game,
+   region and FPS if it runs slowly before changing global settings.
+
+No BIOS or game files are supplied. The ordinary Saturn saves (`.bkr`, `.bcr`,
+`.smpc`) use RetroArch's configured Save directory; save states use its State
+directory. Verify any desired cloud sync separately.
+
+Reference: [Libretro Beetle Saturn documentation](https://docs.libretro.com/library/beetle_saturn/).
 
 ## Change a core
 
@@ -73,6 +110,8 @@ app, then sign/install it as an update to Lab.
 The Makefile recipe supports cores with a root Makefile and an `ios-arm64` target
 producing `<name>_libretro_ios.dylib`. Dolphin uses its upstream iOS CMake recipe
 and pinned recursive submodules, excluding the Windows Qt and FFmpeg SDKs.
+Play! uses its upstream iOS Xcode/CMake recipe and pinned recursive submodules,
+excluding the standalone app's AltKit dependency.
 Other cores may require different recipes,
 submodules, dependencies, BIOS files, graphics support, or JIT. Add these explicitly
 rather than assuming every core uses the same build command.
@@ -161,3 +200,42 @@ Core metadata is from libretro-core-info revision
 
 Compilation and package validation do not establish device compatibility or game
 performance. Those checks require the signed build running on the iPad.
+
+## Play! (PlayStation 2)
+
+The Lab build includes `play.libretro.framework`, compiled from the pinned Play!
+revision in `cores.lock.json`. Its source and dependency revisions are included
+in the build artifact and manifest. Core metadata is from libretro-core-info blob
+`b91e6d04d33a86694d1e14ed8f3cddd962805f33`.
+
+1. Sign and install the new IPA as an update to Lab using the same account, bundle
+   identity, and custom iCloud entitlements used for the previous build.
+2. Run **Online Updater > Update Core Info Files** on an existing installation,
+   then restart. Choose **Load Core > Sony - PlayStation 2 (Play!)**.
+3. Select **Settings > Drivers > Video > gl**, save the configuration, and restart
+   Lab. This core uses OpenGL ES on iOS. Dolphin uses `vulkan`, so change the driver
+   and restart when switching between these two cores.
+4. Enable JIT for **RetroArch Lab** before loading a PS2 game. The Lab patch uses
+   RetroArch's executable-memory API on iOS 26 and newer, including separate
+   executable and writable mappings. Earlier iOS versions retain the legacy JIT
+   path. VM initialization is deferred until this check succeeds; if JIT is not
+   ready, enable it and retry the game.
+5. Load an extracted PS2 `.iso` or `.chd` from Lab's storage. Play! does not require
+   a PS2 BIOS. Start at the native **1x** resolution and test graphics, audio,
+   controller input, an in-game save, and loading that save after restarting.
+
+Play! is experimental; compatibility and speed vary by game. Compilation and
+packaging checks do not establish real iPad gameplay. Its memory cards and
+configuration use the upstream `Play Data Files` directory in the app's Documents
+folder. Back up that folder as well as RetroArch's saves; do not assume the cloud
+Sync Saves option includes it.
+
+The Lab-only Play! patch also routes block linking and cloning through the writable
+mapping and recycles freed code within a frontend-owned arena. The build runs a
+host regression harness against the patched CodeGen sources before compiling iOS.
+This covers separate read/write mappings, block edits, clone/move ownership,
+exhaustion, free-space reuse, concurrency, unavailable JIT, retry, and cleanup.
+Linux x86-64 additionally executes generated and patched code in the harness.
+
+References: [Play! source and iOS instructions](https://github.com/jpd002/Play-),
+[Libretro Play! documentation](https://docs.libretro.com/library/play/).

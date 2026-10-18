@@ -1,0 +1,419 @@
+diff --git a/Source/BasicBlock.cpp b/Source/BasicBlock.cpp
+index 4c460e6..0cb30ee 100644
+--- a/Source/BasicBlock.cpp
++++ b/Source/BasicBlock.cpp
+@@ -408,7 +408,7 @@ void CBasicBlock::LinkBlock(LINK_SLOT linkSlot, CBasicBlock* otherBlock)
+ 	m_linkBlock[linkSlot] = otherBlock;
+ #endif
+ 	auto patchValue = reinterpret_cast<uintptr_t>(otherBlock->m_function.GetCode());
+-	auto code = reinterpret_cast<uint8*>(m_function.GetCode());
++	auto code = reinterpret_cast<uint8*>(m_function.GetWritableCode());
+ 	m_function.BeginModify();
+ 	*reinterpret_cast<uintptr_t*>(code + m_linkBlockTrampolineOffset[linkSlot]) = patchValue;
+ 	m_function.EndModify();
+@@ -426,7 +426,7 @@ void CBasicBlock::UnlinkBlock(LINK_SLOT linkSlot)
+ 	m_linkBlock[linkSlot] = nullptr;
+ #endif
+ 	auto patchValue = (linkSlot == LINK_SLOT_NEXT) ? reinterpret_cast<uintptr_t>(&NextBlockTrampoline) : reinterpret_cast<uintptr_t>(&BranchBlockTrampoline);
+-	auto code = reinterpret_cast<uint8*>(m_function.GetCode());
++	auto code = reinterpret_cast<uint8*>(m_function.GetWritableCode());
+ 	m_function.BeginModify();
+ 	*reinterpret_cast<uintptr_t*>(code + m_linkBlockTrampolineOffset[linkSlot]) = patchValue;
+ 	m_function.EndModify();
+diff --git a/Source/ui_libretro/PlayJitMemory.h b/Source/ui_libretro/PlayJitMemory.h
+new file mode 100644
+index 0000000..93b7604
+--- /dev/null
++++ b/Source/ui_libretro/PlayJitMemory.h
+@@ -0,0 +1,75 @@
++#pragma once
++
++#include <algorithm>
++#include "ext/libretro.h"
++#include "MemoryFunction.h"
++
++// Executable-memory ABI from RetroArch's libretro.h, version 1.
++#ifndef RETRO_ENVIRONMENT_EXEC_MEM_ALLOC
++#define RETRO_ENVIRONMENT_EXEC_MEM_ALLOC 83
++#define RETRO_ENVIRONMENT_EXEC_MEM_FREE 84
++#define RETRO_EXEC_MEM_MODE_UNAVAILABLE 0
++#define RETRO_EXEC_MEM_MODE_UNRESTRICTED 1
++#define RETRO_EXEC_MEM_MODE_RWX 2
++#define RETRO_EXEC_MEM_MODE_WX_TOGGLE 3
++#define RETRO_EXEC_MEM_MODE_DUAL_MAP 4
++struct retro_exec_mem_alloc
++{
++	unsigned version;
++	size_t size;
++	unsigned mode;
++	void* rx;
++	void* rw;
++};
++struct retro_exec_mem_free { void* rx; };
++#endif
++
++class CPlayJitMemory
++{
++public:
++	bool Prepare(retro_environment_t environment)
++	{
++		if(m_rx) return true;
++		retro_exec_mem_alloc probe = {1, 0, RETRO_EXEC_MEM_MODE_UNAVAILABLE, nullptr, nullptr};
++		if(environment(RETRO_ENVIRONMENT_EXEC_MEM_ALLOC, &probe))
++		{
++			if(probe.mode == RETRO_EXEC_MEM_MODE_DUAL_MAP || probe.mode == RETRO_EXEC_MEM_MODE_RWX)
++			{
++				size_t size = 256 * 1024 * 1024;
++				if(probe.size) size = std::min(size, probe.size);
++				retro_exec_mem_alloc allocation = {1, size, RETRO_EXEC_MEM_MODE_UNAVAILABLE, nullptr, nullptr};
++				if(!environment(RETRO_ENVIRONMENT_EXEC_MEM_ALLOC, &allocation)) return false;
++				if(!allocation.rx || !allocation.rw || allocation.size < size ||
++				   (allocation.mode != RETRO_EXEC_MEM_MODE_DUAL_MAP && allocation.mode != RETRO_EXEC_MEM_MODE_RWX) ||
++				   !CMemoryFunction::SetExternalMemory(allocation.rx, allocation.rw, allocation.size))
++				{
++					if(allocation.rx)
++					{
++						retro_exec_mem_free release = {allocation.rx};
++						environment(RETRO_ENVIRONMENT_EXEC_MEM_FREE, &release);
++					}
++					return false;
++				}
++				m_rx = allocation.rx;
++				return true;
++			}
++			if(probe.mode != RETRO_EXEC_MEM_MODE_WX_TOGGLE && probe.mode != RETRO_EXEC_MEM_MODE_UNRESTRICTED)
++				return false;
++		}
++		bool canJit = false;
++		return environment(RETRO_ENVIRONMENT_GET_JIT_CAPABLE, &canJit) && canJit;
++	}
++
++	void Release(retro_environment_t environment)
++	{
++		if(m_rx && CMemoryFunction::SetExternalMemory(nullptr, nullptr, 0))
++		{
++			retro_exec_mem_free release = {m_rx};
++			environment(RETRO_ENVIRONMENT_EXEC_MEM_FREE, &release);
++			m_rx = nullptr;
++		}
++	}
++
++private:
++	void* m_rx = nullptr;
++};
+diff --git a/Source/ui_libretro/main_libretro.cpp b/Source/ui_libretro/main_libretro.cpp
+index 8a07c26..7842ca2 100644
+--- a/Source/ui_libretro/main_libretro.cpp
++++ b/Source/ui_libretro/main_libretro.cpp
+@@ -16,6 +16,10 @@
+ 
+ #include "filesystem_def.h"
+ #include "DefaultAppConfig.h"
++#if defined(IOS)
++#include "PlayJitMemory.h"
++static CPlayJitMemory g_jitMemory;
++#endif
+ 
+ #include <vector>
+ #include <cstdlib>
+@@ -248,6 +252,7 @@ size_t retro_serialize_size(void)
+ 
+ bool retro_serialize(void* data, size_t size)
+ {
++	if(!m_virtualMachine || !m_virtualMachine->GetGSHandler()) return false;
+ 	CLog::GetInstance().Print(LOG_NAME, "%s\n", __FUNCTION__);
+ 
+ 	try
+@@ -273,6 +278,7 @@ bool retro_serialize(void* data, size_t size)
+ 
+ bool retro_unserialize(const void* data, size_t size)
+ {
++	if(!m_virtualMachine || !m_virtualMachine->GetGSHandler()) return false;
+ 	CLog::GetInstance().Print(LOG_NAME, "%s\n", __FUNCTION__);
+ 
+ 	try
+@@ -305,7 +311,7 @@ void* retro_get_memory_data(unsigned id)
+ {
+ 	CLog::GetInstance().Print(LOG_NAME, "%s\n", __FUNCTION__);
+ 
+-	if(id == RETRO_MEMORY_SYSTEM_RAM)
++	if(m_virtualMachine && id == RETRO_MEMORY_SYSTEM_RAM)
+ 	{
+ 		return m_virtualMachine->m_ee->m_ram;
+ 	}
+@@ -316,7 +322,7 @@ size_t retro_get_memory_size(unsigned id)
+ {
+ 	CLog::GetInstance().Print(LOG_NAME, "%s\n", __FUNCTION__);
+ 
+-	if(id == RETRO_MEMORY_SYSTEM_RAM)
++	if(m_virtualMachine && id == RETRO_MEMORY_SYSTEM_RAM)
+ 	{
+ 		return PS2::EE_RAM_SIZE;
+ 	}
+@@ -475,23 +481,37 @@ void retro_reset(void)
+ 	first_run = false;
+ }
+ 
++static void InitializeVirtualMachine()
++{
++	m_virtualMachine = new CPS2VM();
++	m_virtualMachine->Initialize();
++
++	//Disable frame limiter, RetroArch handles this on its own
++	CAppConfig::GetInstance().SetPreferenceBoolean(PREF_PS2_LIMIT_FRAMERATE, false);
++	m_virtualMachine->ReloadFrameRateLimit();
++
++	SetupInputHandler();
++	SetupSoundHandler();
++}
++
+ bool retro_load_game(const retro_game_info* info)
+ {
+ 	CLog::GetInstance().Print(LOG_NAME, "%s\n", __FUNCTION__);
+ 
+ #if defined(IOS)
+-	bool can_jit = false;
+-	if(g_environ_cb(RETRO_ENVIRONMENT_GET_JIT_CAPABLE, &can_jit) && !can_jit)
++	if(!g_jitMemory.Prepare(g_environ_cb))
+ 	{
+ 		// trying to run without the jit will cause a crash.
+ 		retro_message retromsg;
+-		retromsg.msg = "Cannot run without JIT";
++		retromsg.msg = "Enable JIT for RetroArch Lab, then retry Play!";
+ 		retromsg.frames = 5000 / 17;
+ 		g_environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, &retromsg);
+ 		return false;
+ 	}
+ #endif
+ 
++	if(!m_virtualMachine) InitializeVirtualMachine();
++
+ 	fs::path filePath = info->path;
+ 	if(BootableUtils::IsBootableExecutablePath(filePath))
+ 	{
+@@ -556,15 +576,9 @@ void retro_init()
+ 
+ 	CAppConfig::GetInstance().RegisterPreferenceInteger(PREF_AUDIO_SPUBLOCKCOUNT, 22);
+ 
+-	m_virtualMachine = new CPS2VM();
+-	m_virtualMachine->Initialize();
+-
+-	//Disable frame limiter, RetroArch handles this on its own
+-	CAppConfig::GetInstance().SetPreferenceBoolean(PREF_PS2_LIMIT_FRAMERATE, false);
+-	m_virtualMachine->ReloadFrameRateLimit();
+-
+-	SetupInputHandler();
+-	SetupSoundHandler();
++#if !defined(IOS)
++	InitializeVirtualMachine();
++#endif
+ 	first_run = false;
+ }
+ 
+@@ -593,5 +607,8 @@ void retro_deinit()
+ 		delete m_virtualMachine;
+ 		m_virtualMachine = nullptr;
+ 	}
++#if defined(IOS)
++	g_jitMemory.Release(g_environ_cb);
++#endif
+ 	libretro_supports_bitmasks = false;
+ }
+diff --git a/deps/CodeGen/include/MemoryFunction.h b/deps/CodeGen/include/MemoryFunction.h
+index fca4a0f..45598fa 100644
+--- a/deps/CodeGen/include/MemoryFunction.h
++++ b/deps/CodeGen/include/MemoryFunction.h
+@@ -24,6 +24,8 @@ public:
+ 	void operator()(void*);
+ 
+ 	void* GetCode() const;
++	void* GetWritableCode() const;
++	static bool SetExternalMemory(void*, void*, size_t);
+ 	size_t GetSize() const;
+ 
+ 	void BeginModify();
+@@ -37,6 +39,8 @@ private:
+ 
+ 	void* m_code;
+ 	size_t m_size;
++	void* m_writableCode = nullptr;
++	bool m_external = false;
+ #if defined(__EMSCRIPTEN__)
+ 	emscripten::val m_wasmModule;
+ #endif
+diff --git a/deps/CodeGen/src/MemoryFunction.cpp b/deps/CodeGen/src/MemoryFunction.cpp
+index 73a3dab..03792ed 100644
+--- a/deps/CodeGen/src/MemoryFunction.cpp
++++ b/deps/CodeGen/src/MemoryFunction.cpp
+@@ -3,6 +3,9 @@
+ #include <assert.h>
+ #include <algorithm>
+ #include <cstdint>
++#include <map>
++#include <mutex>
++#include <new>
+ #include "AlignedAlloc.h"
+ #include "MemoryFunction.h"
+ 
+@@ -10,6 +13,29 @@
+ 
+ #define BLOCK_ALIGN 0x10
+ 
++namespace
++{
++	std::mutex arenaMutex;
++	uint8* arenaRx = nullptr;
++	uint8* arenaRw = nullptr;
++	size_t arenaLive = 0;
++	std::map<size_t, size_t> arenaFree;
++}
++
++bool CMemoryFunction::SetExternalMemory(void* rx, void* rw, size_t size)
++{
++	std::lock_guard<std::mutex> lock(arenaMutex);
++	if(arenaLive) return false;
++	if((rx || rw || size) && (!rx || !rw || !size ||
++	   (reinterpret_cast<uintptr_t>(rx) % BLOCK_ALIGN) ||
++	   (reinterpret_cast<uintptr_t>(rw) % BLOCK_ALIGN) || (size % BLOCK_ALIGN))) return false;
++	arenaFree.clear();
++	if(size) arenaFree.emplace(0, size);
++	arenaRx = static_cast<uint8*>(rx);
++	arenaRw = static_cast<uint8*>(rw);
++	return true;
++}
++
+ #ifdef _WIN32
+ 	#define MEMFUNC_USE_WIN32
+ #elif defined(__APPLE__)
+@@ -90,6 +116,29 @@ CMemoryFunction::CMemoryFunction()
+ CMemoryFunction::CMemoryFunction(const void* code, size_t size)
+ : m_code(nullptr)
+ {
++	{
++		std::lock_guard<std::mutex> lock(arenaMutex);
++		if(arenaRx)
++		{
++			if(!size || size > SIZE_MAX - (BLOCK_ALIGN - 1)) throw std::bad_alloc();
++			size_t aligned = (size + BLOCK_ALIGN - 1) & ~(size_t(BLOCK_ALIGN) - 1);
++			auto chunk = std::find_if(arenaFree.begin(), arenaFree.end(),
++			    [aligned](const auto& entry) { return entry.second >= aligned; });
++			if(chunk == arenaFree.end()) throw std::bad_alloc();
++			size_t offset = chunk->first;
++			if(chunk->second > aligned)
++				arenaFree.emplace(offset + aligned, chunk->second - aligned);
++			arenaFree.erase(chunk);
++			m_code = arenaRx + offset;
++			m_writableCode = arenaRw + offset;
++			m_size = size;
++			m_external = true;
++			arenaLive++;
++			memcpy(m_writableCode, code, size);
++			ClearCache();
++			return;
++		}
++	}
+ #if defined(MEMFUNC_USE_WIN32)
+ 	m_size = size;
+ 	m_code = framework_aligned_alloc(size, BLOCK_ALIGN);
+@@ -147,6 +196,7 @@ CMemoryFunction::~CMemoryFunction()
+ void CMemoryFunction::ClearCache()
+ {
+ #ifdef __APPLE__
++	if(m_external) sys_dcache_flush(m_writableCode, m_size);
+ 	sys_icache_invalidate(m_code, m_size);
+ #elif defined(MEMFUNC_USE_MMAP)
+ 	#if defined(__arm__) || defined(__aarch64__)
+@@ -159,6 +209,31 @@ void CMemoryFunction::Reset()
+ {
+ 	if(m_code != nullptr)
+ 	{
++		if(m_external)
++		{
++			std::lock_guard<std::mutex> lock(arenaMutex);
++			size_t offset = static_cast<uint8*>(m_code) - arenaRx;
++			size_t aligned = (m_size + BLOCK_ALIGN - 1) & ~(size_t(BLOCK_ALIGN) - 1);
++			auto chunk = arenaFree.emplace(offset, aligned).first;
++			auto next = std::next(chunk);
++			if(next != arenaFree.end() && chunk->first + chunk->second == next->first)
++			{
++				chunk->second += next->second;
++				arenaFree.erase(next);
++			}
++			if(chunk != arenaFree.begin())
++			{
++				auto previous = std::prev(chunk);
++				if(previous->first + previous->second == chunk->first)
++				{
++					previous->second += chunk->second;
++					arenaFree.erase(chunk);
++				}
++			}
++			arenaLive--;
++		}
++		else
++		{
+ #if defined(MEMFUNC_USE_WIN32)
+ 		framework_aligned_free(m_code);
+ #elif defined(MEMFUNC_USE_MACHVM)
+@@ -168,9 +243,12 @@ void CMemoryFunction::Reset()
+ #elif defined(MEMFUNC_USE_WASM)
+ 		WasmDeleteFunction(reinterpret_cast<int>(m_code));
+ #endif
++		}
+ 	}
+ 	m_code = nullptr;
+ 	m_size = 0;
++	m_writableCode = nullptr;
++	m_external = false;
+ #if defined(MEMFUNC_USE_WASM)
+ 	m_wasmModule = emscripten::val();
+ #endif
+@@ -186,6 +264,8 @@ CMemoryFunction& CMemoryFunction::operator =(CMemoryFunction&& rhs)
+ 	Reset();
+ 	std::swap(m_code, rhs.m_code);
+ 	std::swap(m_size, rhs.m_size);
++	std::swap(m_writableCode, rhs.m_writableCode);
++	std::swap(m_external, rhs.m_external);
+ #if defined(MEMFUNC_USE_WASM)
+ 	std::swap(m_wasmModule, rhs.m_wasmModule);
+ #endif
+@@ -204,6 +284,11 @@ void* CMemoryFunction::GetCode() const
+ 	return m_code;
+ }
+ 
++void* CMemoryFunction::GetWritableCode() const
++{
++	return m_external ? m_writableCode : m_code;
++}
++
+ size_t CMemoryFunction::GetSize() const
+ {
+ 	return m_size;
+@@ -211,6 +296,7 @@ size_t CMemoryFunction::GetSize() const
+ 
+ void CMemoryFunction::BeginModify()
+ {
++	if(m_external) return;
+ #if defined(MEMFUNC_USE_MACHVM) && defined(MEMFUNC_MACHVM_STRICT_PROTECTION)
+ 	kern_return_t result = vm_protect(mach_task_self(), reinterpret_cast<vm_address_t>(m_code), m_size, 0, VM_PROT_READ | VM_PROT_WRITE);
+ 	assert(result == 0);
+@@ -221,6 +307,11 @@ void CMemoryFunction::BeginModify()
+ 
+ void CMemoryFunction::EndModify()
+ {
++	if(m_external)
++	{
++		ClearCache();
++		return;
++	}
+ #if defined(MEMFUNC_USE_MACHVM) && defined(MEMFUNC_MACHVM_STRICT_PROTECTION)
+ 	kern_return_t result = vm_protect(mach_task_self(), reinterpret_cast<vm_address_t>(m_code), m_size, 0, VM_PROT_READ | VM_PROT_EXECUTE);
+ 	assert(result == 0);
+@@ -239,6 +330,6 @@ CMemoryFunction CMemoryFunction::CreateInstance()
+ 	result.m_code = reinterpret_cast<void*>(WasmCreateFunction(m_wasmModule.as_handle()));
+ 	return result;
+ #else
+-	return CMemoryFunction(GetCode(), GetSize());
++	return CMemoryFunction(GetWritableCode(), GetSize());
+ #endif
+ }
