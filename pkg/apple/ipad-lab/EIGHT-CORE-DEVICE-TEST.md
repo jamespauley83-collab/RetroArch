@@ -246,8 +246,8 @@ from the standalone PS2 Test result. The guided session included graphics,
 audio, controls and pause/resume; James reported the overall pass without
 separate measurements. Exact duration, game/edition, controller, resolution,
 card filenames/paths and screenshots were not supplied. Do not claim a measured
-15-minute run or independently inspected card files. No new build was installed
-by this workflow, and the uninstalled JIT correction remains unvalidated.
+15-minute run or independently inspected card files. This earlier session used
+the Files-Fix package; the later build 42 update and smoke test are recorded below.
 
 | Check | Current evidence |
 | --- | --- |
@@ -258,7 +258,7 @@ by this workflow, and the uninstalled JIT correction remains unvalidated.
 | Fresh PS2 memory-card save | Passed by James's October 18 report: saving and reload after restart in Lab 8 Test. Actual card path/files and saved-progress identifier remain unrecorded. |
 | ARMSX2/Yabause switching | Passed by James's October 18 report: all three requested round trips passed, with both saves, sound and controls intact. No restart/JIT recovery or failure was reported. NES/SNES-inclusive switching from the broader checklist is not established. |
 | Actual iPad save locations | Pending device observation. Expected ARMSX2 path: `<configured System/BIOS>/pcsx2/memcards`; expected Yabause: configured frontend Save Files directory, with any active core/game subfolders. |
-| Latest JIT source correction | Not in the installed Files-Fix package. Recovery is not validation of `b0a26e4`; targeted iPhoneOS compilation and device verification remain pending. |
+| Latest JIT source correction | Build 42 compiled the correction and its unsigned package was verified. James reports the guided update and PS2/Yabause launch with existing saves; see the build 42 section below. Signed output remains uninspected. |
 
 ### PS2 procedure used for the reported pass
 
@@ -326,6 +326,53 @@ remaining lifecycle/core comparisons and working-app regression evidence.
 This session does not change working-app data to exercise cloud sync. Candidate
 cloud acceptance requires a future dedicated test-container build; this
 repackaged app must never receive working-container cloud entitlements.
+
+## October 18 build 42 update and smoke test
+
+[Build 42](https://github.com/jamespauley83-collab/RetroArch/actions/runs/39132912729)
+successfully compiled commit `68f22a39b82c03d5d667c8dc2260bb3b56c111cd`
+with ARMSX2 enabled. Native library/UI checks, simulated iCloud checks, core/app
+compilation, isolated eight-core packaging and artifact upload all passed.
+This build includes the JIT Library-gate correction and launch diagnostics.
+
+Artifact `12139268037` was downloaded and its SHA-256 matched GitHub:
+`fb3619236dfd530c97125ec13c31e532ba086ce5decb2f9ee00f8364507c9fae`.
+The separate unsigned test IPA SHA-256 is
+`14df4b6a5550d53c94555600fd68dc04f7480604f82c0a0ca3c9436e55fb9099`.
+Independent inspection passed the IPA checksum, embedded/external manifest
+agreement, eight-core inventory and hashes, ARM64/iPhoneOS 26 deployment,
+resource hashes, Files visibility, separate identity, absence of the widget
+and provisioned/embedded entitlement slots, and runtime equality with the
+source CI IPA. The ARMSX2 binary contains the new launch-diagnostics marker.
+The artifact ZIP and extracted IPA checksums also matched on the Lenovo.
+
+The Sideloadly setup screenshot displayed iPadOS 27.2, the test IPA and
+`com.jamespauley.retroarchlab.eightcoretest`; custom entitlements and tweak
+injection were off. Automatic bundle ID was initially on. James was instructed
+to disable it, retain the exact test identifier and signing account, back up
+the current test saves and update without uninstalling. He replied **"done"**.
+No final installer-completion screenshot, signed IPA/profile or backup
+inventory was captured; this is a user-reported update, not independently
+verified final signing or backup evidence. Do not publish account or device
+identifiers from the setup screenshot.
+
+At 11:24 AM America/New_York, James answered **"yes"** to:
+**"Do both games launch and load your saved progress?"** The preceding guided
+check was app-specific StikDebug `universal.js`, PS2 launch from the native
+Library and loading its existing memory-card save, followed by Close Content,
+Yabause launch and loading the existing Saturn save.
+
+Record the updated-build launch/save-load smoke test as passed by user report.
+The verified input package ties the guided update to build 42, but the
+installed binary was not independently read back. This result does not
+reassign the earlier sustained gameplay, fresh-save/restart or three-round
+switching results to build 42, nor establish all games, cores or iCloud sync.
+
+Remaining release evidence: signed-output isolation, verified backup and actual
+save paths/screenshots; background/foreground and lock/unlock recovery;
+remaining core/renderer transitions and working-Lab save/cloud regression.
+Keep PR #12 draft and test-app cloud sync off. Do not repeat the completed
+launch/save-load check solely to reconfirm it.
 
 ## Reproduce the unsigned test copy
 
