@@ -42,6 +42,9 @@ static void *state_copy(void *target, const void *source, size_t size)
 
 #define malloc state_malloc
 #define free state_free
+#ifdef memcpy
+#undef memcpy
+#endif
 #define memcpy state_copy
 #include "state_functions.inc"
 #undef malloc
