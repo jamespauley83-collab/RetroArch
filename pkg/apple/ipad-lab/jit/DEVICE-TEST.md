@@ -52,3 +52,13 @@ attempts until it exits or the app is restarted.
 
 Compilation and package checks are separate from signing and physical-device
 acceptance. Do not merge or replace working Lab based on compilation alone.
+
+## Build verification — October 19, 2026
+
+[CI run 39180567671](https://github.com/jamespauley83-collab/RetroArch/actions/runs/39180567671)
+successfully built runtime commit `dbe80de88a5dd0535b76f8a7a6a0a2577c6fc013`
+with Xcode 26.3. All 61 Lab and 12 ARMSX2 tests passed, along with native iOS
+type checks, helper/framework compilation, the complete app build, and isolated
+package validation. The test IPA SHA-256 is
+`abe1136bf671c843f7d60d53f06e8fcae47fcfe547eb6638e826c3b1acbb0ba1`.
+It is unsigned and has not passed physical-device JIT acceptance. Keep the PR draft.
