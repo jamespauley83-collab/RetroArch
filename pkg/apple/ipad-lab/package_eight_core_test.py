@@ -241,6 +241,9 @@ def package(artifacts, destination):
             shutil.copy2(artifacts / core['system_files']['file'], destination)
     guide = Path(__file__).with_name('EIGHT-CORE-DEVICE-TEST.md')
     shutil.copy2(guide, destination)
+    if derived.get('stikjit'):
+        shutil.copy2(Path(__file__).with_name('jit') / 'DEVICE-TEST.md',
+                     destination / 'JIT-DEVICE-TEST.md')
     print('Isolated unsigned test copy:', ipa)
     print('SHA-256:', derived['ipa_sha256'])
     print('Signing and all physical-device tests remain pending.')

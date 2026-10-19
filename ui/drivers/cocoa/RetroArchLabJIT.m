@@ -260,6 +260,8 @@ extern CFTypeRef SecTaskCopyValueForEntitlement(CFTypeRef task, CFStringRef enti
       NSDictionary *response = [items.firstObject isKindOfClass:NSExtensionItem.class] ? ((NSExtensionItem *)items.firstObject).userInfo : nil;
       dispatch_async(dispatch_get_main_queue(), ^{
          RALabJIT *owner = weakSelf;
+         if (enabling && [response[@"success"] boolValue] && !owner.poolReady)
+            owner.poolReady = exec_mem_pool_init();
          BOOL ready = [response[@"success"] boolValue] && (!enabling || owner.poolReady);
          NSString *message = response[@"message"] ?: @"The helper returned no result.";
          if (enabling && [response[@"success"] boolValue] && !owner.poolReady) message = @"The debugger finished but executable memory is not ready. No game was started.";
