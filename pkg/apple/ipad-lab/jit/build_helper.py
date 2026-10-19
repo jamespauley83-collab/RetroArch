@@ -30,10 +30,16 @@ def build(source, work, artifacts, bundle_id):
               'CODE_SIGNING_REQUIRED=NO', 'DEVELOPMENT_TEAM=',
               'CONFIGURATION_BUILD_DIR=' + str(products)]
     run('xcodebuild', '-project', repo / 'StikJIT.xcodeproj', '-scheme', 'StikJIT',
-        '-derivedDataPath', work / 'StikDerived', *common, 'build')
+        '-derivedDataPath', work / 'StikDerived', *common,
+        'GENERATE_INFOPLIST_FILE=YES', 'PRODUCT_BUNDLE_IDENTIFIER=org.stikdebug.StikJIT',
+        'MARKETING_VERSION=1.0', 'CURRENT_PROJECT_VERSION=1', 'build')
     helper_source = work / 'jit-helper'
     shutil.copytree(source, helper_source)
     framework = products / 'StikJIT.framework'
+    framework_info = plistlib.loads((framework / 'Info.plist').read_bytes())
+    if (framework_info.get('CFBundleExecutable') != 'StikJIT'
+            or framework_info.get('CFBundlePackageType') != 'FMWK'):
+        raise RuntimeError('StikJIT framework has invalid bundle metadata.')
     shutil.copytree(framework, helper_source / framework.name)
     run('xcodegen', 'generate', cwd=helper_source)
     run('xcodebuild', '-project', helper_source / 'RALabJITHelper.xcodeproj',
