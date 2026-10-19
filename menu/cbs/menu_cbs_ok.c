@@ -82,6 +82,9 @@
 #include "../../playlist.h"
 #include "../../retroarch.h"
 #include "../../runloop.h"
+#ifdef HAVE_RETROARCH_LAB_STIKJIT
+#include "../../ui/drivers/cocoa/RetroArchLabLibrary.h"
+#endif
 #include "../../verbosity.h"
 #include "../../lakka.h"
 #ifdef HAVE_BLUETOOTH
@@ -6338,6 +6341,15 @@ STATIC_DEFAULT_ACTION_OK_CMD_FUNC(action_ok_shader_apply_changes,     CMD_EVENT_
 #endif
 STATIC_DEFAULT_ACTION_OK_CMD_FUNC(action_ok_show_wimp,                CMD_EVENT_UI_COMPANION_TOGGLE)
 
+#ifdef HAVE_RETROARCH_LAB_STIKJIT
+static int action_ok_lab_jit_setup(const char *path, const char *label,
+      unsigned type, size_t idx, size_t entry_idx)
+{
+   cocoa_lab_show_jit_settings();
+   return 0;
+}
+#endif
+
 static int action_ok_set_core_association(const char *path,
       const char *label, unsigned type, size_t idx, size_t entry_idx)
 {
@@ -9652,6 +9664,9 @@ static int menu_cbs_init_bind_ok_compare_label(menu_file_list_cbs_t *cbs,
          {MENU_ENUM_LABEL_MENU_DISABLE_KIOSK_MODE,             action_ok_disable_kiosk_mode},
          {MENU_ENUM_LABEL_XMB_MAIN_MENU_ENABLE_SETTINGS,       action_ok_enable_settings},
          {MENU_ENUM_LABEL_SHOW_WIMP,                           action_ok_show_wimp},
+#ifdef HAVE_RETROARCH_LAB_STIKJIT
+         {MENU_ENUM_LABEL_LAB_JIT_SETUP,                       action_ok_lab_jit_setup},
+#endif
          {MENU_ENUM_LABEL_QUIT_RETROARCH,                      action_ok_quit},
          {MENU_ENUM_LABEL_CLOSE_CONTENT,                       action_ok_close_content},
          {MENU_ENUM_LABEL_SAVE_NEW_CONFIG,                     action_ok_save_new_config},

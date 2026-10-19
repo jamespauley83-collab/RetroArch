@@ -15,8 +15,10 @@ fallback choices. An unsuccessful method never silently switches to another.
    Keep extensions in the sideloader. Both app identifiers must be unique to the
    test app. Keep the host's `get-task-allow`; do not add cloud, app-group or shared
    keychain permissions. Check the exported signed package before installation.
-2. Open the test app normally. Choose Library > JIT Setup > Import pairing file
+2. Open the test app normally. Choose Settings > JIT Setup > Import pairing file
    and import the pairing plist for this device. Developer Mode must be enabled.
+   JIT Setup is the first entry in the ordinary Settings list. The native Library
+   toolbar also provides it, but the Library screen and gesture are not required.
 3. Connect LocalDevVPN. Check setup can verify connectivity and mount the developer
    disk image. Its first run may download files. Then launch a PS2 game from Library.
 4. If the helper is unavailable, explicitly choose StikDebug. The app sends its
@@ -36,6 +38,8 @@ This new build requires its own JIT activation checks:
 
 - Confirm actual host/helper identifiers, profile coverage, executable signatures,
   get-task-allow and no-cloud/scoped-keychain entitlements before device use.
+- From the ordinary XMB Settings list, open JIT Setup and verify that Import
+  pairing file and Check setup are reachable without opening the native Library.
 - Open the test app from its own icon; launch the known PS2 game via Library and
   confirm built-in activation, game start and existing save availability.
 - Close and relaunch the test app, then verify built-in activation for the new process.

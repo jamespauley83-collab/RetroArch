@@ -74,6 +74,12 @@ S_ACTION(USER_INTERFACE_SETTINGS,
       "user_interface_settings",
       "User Interface",
       "Change user interface settings.")
+#if defined(HAVE_RETROARCH_LAB_STIKJIT) || defined(SETTINGS_DEF_STRINGS_PASS)
+S_ACTION(LAB_JIT_SETUP,
+      "lab_jit_setup",
+      "JIT Setup",
+      "Import this device's pairing file, check setup, or enable JIT for this app.")
+#endif
 S_ACTION(AI_SERVICE_SETTINGS,
       "ai_service_settings",
       "AI Service",

@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #import "RetroArchLabJIT.h"
+#import "RetroArchLabLibrary.h"
+#import "cocoa_common.h"
 #import <Security/Security.h>
 #import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #include <dlfcn.h>
@@ -14,6 +16,26 @@
 - (void)setRequestCancellationBlock:(void (^)(NSUUID *, NSError *))block;
 - (void)setRequestInterruptionBlock:(void (^)(NSUUID *))block;
 @end
+
+void cocoa_lab_show_jit_settings(void)
+{
+   dispatch_async(dispatch_get_main_queue(), ^{
+      UIViewController *presenter = nil;
+      for (UIScene *scene in UIApplication.sharedApplication.connectedScenes)
+      {
+         if (scene.activationState != UISceneActivationStateForegroundActive
+               || ![scene isKindOfClass:UIWindowScene.class]) continue;
+         for (UIWindow *window in ((UIWindowScene *)scene).windows)
+            if (window.isKeyWindow) presenter = window.rootViewController;
+      }
+      if (!presenter) presenter = [CocoaView get].view.window.rootViewController;
+      while (presenter.presentedViewController
+            && !presenter.presentedViewController.isBeingDismissed)
+         presenter = presenter.presentedViewController;
+      if (presenter.view.window)
+         [[RALabJIT shared] showSettingsFrom:presenter];
+   });
+}
 
 extern CFTypeRef SecTaskCreateFromSelf(CFAllocatorRef allocator);
 extern CFTypeRef SecTaskCopyValueForEntitlement(CFTypeRef task, CFStringRef entitlement, CFErrorRef *error);

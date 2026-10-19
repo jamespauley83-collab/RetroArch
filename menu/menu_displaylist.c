@@ -12864,6 +12864,9 @@ unsigned menu_displaylist_build_list(
             bool settings_show_ai_service = settings->bools.settings_show_ai_service;
 #endif
             static menu_displaylist_build_info_selective_t build_list[] = {
+#ifdef HAVE_RETROARCH_LAB_STIKJIT
+               {MENU_ENUM_LABEL_LAB_JIT_SETUP,               PARSE_ACTION, true},
+#endif
                {MENU_ENUM_LABEL_USER_INTERFACE_SETTINGS,     PARSE_ACTION, true},
                {MENU_ENUM_LABEL_VIDEO_SETTINGS,              PARSE_ACTION, true},
                {MENU_ENUM_LABEL_AUDIO_SETTINGS,              PARSE_ACTION, true},
