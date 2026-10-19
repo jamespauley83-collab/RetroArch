@@ -1,0 +1,54 @@
+# Built-in StikJIT candidate
+
+This optional build adds a native Library JIT Setup screen and a classic helper
+extension. Launching ARMSX2, Dolphin or Play! from the Library requests activation
+before queuing content. ARMSX2 retains its own arena validation; ordinary cores
+remain usable without activation. Advanced launch paths still require JIT to have
+been enabled first (use JIT Setup > Enable JIT now).
+
+The default is Built-in StikJIT. StikDebug and Wait for debugger remain explicit
+fallback choices. An unsuccessful method never silently switches to another.
+
+## Initial setup
+
+1. Sign the isolated Lab 8 Test IPA, its `JITHelper` extension and all frameworks.
+   Keep extensions in the sideloader. Both app identifiers must be unique to the
+   test app. Keep the host's `get-task-allow`; do not add cloud, app-group or shared
+   keychain permissions. Check the exported signed package before installation.
+2. Open the test app normally. Choose Library > JIT Setup > Import pairing file
+   and import the pairing plist for this device. Developer Mode must be enabled.
+3. Connect LocalDevVPN. Check setup can verify connectivity and mount the developer
+   disk image. Its first run may download files. Then launch a PS2 game from Library.
+4. If the helper is unavailable, explicitly choose StikDebug. The app sends its
+   actual installed bundle identifier, PID and universal.js in the handoff.
+
+Pairing bytes are stored in the host's default private Keychain access group,
+WhenUnlockedThisDeviceOnly. They are not copied to Documents or iCloud. The helper
+receives them through its extension request, temporarily writes them under its
+private, backup-excluded Library directory, and deletes them on completion and on
+the next non-reset request after interruption. The framework's DDI cache stays in
+the helper. No App Group is required.
+
+## Focused new acceptance
+
+Do not repeat the previously completed eight-core tests merely to reconfirm them.
+This new build requires its own JIT activation checks:
+
+- Confirm actual host/helper identifiers, profile coverage, executable signatures,
+  get-task-allow and no-cloud/scoped-keychain entitlements before device use.
+- Open the test app from its own icon; launch the known PS2 game via Library and
+  confirm built-in activation, game start and existing save availability.
+- Close and relaunch the test app, then verify built-in activation for the new process.
+- Cancel the wait and confirm that no game launches later. A running helper is
+  allowed to finish; if it stalls, close/reopen the test app before retrying.
+- With VPN disconnected, verify an actionable error and no game launch; reconnect
+  and retry. Check missing pairing, unavailable helper, and StikDebug fallback.
+- Confirm Saturn still opens without JIT, and working Lab remains intact.
+
+Activation completion requires a prepared executable-memory pool. A helper success
+response or URL-open success alone is insufficient. A 180-second wait stops automatic
+launch; late completion cannot start content. A stuck helper blocks overlapping
+attempts until it exits or the app is restarted.
+
+Compilation and package checks are separate from signing and physical-device
+acceptance. Do not merge or replace working Lab based on compilation alone.

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Build an isolated iOS app with pinned, source-built libretro cores."""
 import argparse
+import importlib.util
 import hashlib
 import json
 import os
@@ -284,7 +285,7 @@ def package_app(app, work, artifacts, manifest):
     return ipa
 
 
-def build(root, with_armsx2=False):
+def build(root, with_armsx2=False, with_stikjit=False):
     if platform.system() != 'Darwin' or not shutil.which('xcodebuild'):
         raise RuntimeError('The iPad build requires macOS with full Xcode; use the GitHub Actions workflow.')
     revision = output('git', 'rev-parse', 'HEAD', cwd=root)
@@ -300,6 +301,8 @@ def build(root, with_armsx2=False):
     run('tar', '-xf', work / 'source.tar', '-C', source)
     (work / 'source.tar').unlink()
     lock = load_lock(source / LAB / 'cores.lock.json')
+    if with_stikjit and not with_armsx2:
+        raise ValueError('The JIT helper candidate requires the eight-core iOS 26 build.')
     if with_armsx2:
         armsx2_inputs(root, revision)
         lock['minimum_ios'] = '26.0'
@@ -331,6 +334,12 @@ def build(root, with_armsx2=False):
         'entitlements_file': entitlements.name,
         'requires_device_provisioning': True,
     }
+    jit_products = None
+    if with_stikjit:
+        spec = importlib.util.spec_from_file_location('lab_jit_build', source / LAB / 'jit/build_helper.py')
+        jit_build = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(jit_build)
+        jit_products, manifest['stikjit'] = jit_build.build(source / LAB / 'jit', work, artifacts, lock['bundle_id'])
     for core in lock['cores']:
         repo = work / core['name']
         run('git', 'init', repo)
@@ -384,6 +393,7 @@ def build(root, with_armsx2=False):
             '-destination', 'generic/platform=iOS', '-derivedDataPath', str(work / 'DerivedData'),
             '-xcconfig', str(source / LAB / 'Lab.xcconfig'),
             'IOS_BUNDLE_IDENTIFIER=' + lock['bundle_id'],
+            'LAB_JIT_FLAGS=' + ('-DHAVE_RETROARCH_LAB_STIKJIT' if with_stikjit else ''),
             'LAB_ICLOUD_CONTAINER=' + manifest['icloud_drive']['container'],
             'IOS_CODE_SIGN_ENTITLEMENTS=' + str(entitlements),
             'RA_IPHONEOS_DEPLOYMENT_TARGET=' + lock['minimum_ios'],
@@ -393,6 +403,8 @@ def build(root, with_armsx2=False):
             'APPSTORE_BUILD=', 'build',
         ], cwd=apple, stdout=log, stderr=subprocess.STDOUT, check=True)
     app = work / 'DerivedData/Build/Products/Release-iphoneos/RetroArch.app'
+    if with_stikjit:
+        jit_build.embed(app, jit_products, source / LAB / 'jit')
     validate_app(app, lock)
     run('xcrun', 'lipo', app / 'RetroArch', '-verify_arch', 'arm64')
     ipa = package_app(app, work, artifacts, manifest)
@@ -405,6 +417,7 @@ def build(root, with_armsx2=False):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--with-stikjit', action='store_true', help='Embed the optional JIT helper')
     parser.add_argument('--with-armsx2', action='store_true',
                         help='Add the same-revision ARMSX2 device-test build as an additional core')
     parser.add_argument('--check', action='store_true', help='Validate inputs without Xcode or downloads')
@@ -421,7 +434,7 @@ def main():
                     raise ValueError('Core info missing from bundled assets: ' + core['name'])
         print('Inputs valid: ' + ', '.join(c['name'] for c in lock['cores']))
     else:
-        build(ROOT, with_armsx2=args.with_armsx2)
+        build(ROOT, with_armsx2=args.with_armsx2, with_stikjit=args.with_stikjit)
 
 
 if __name__ == '__main__':

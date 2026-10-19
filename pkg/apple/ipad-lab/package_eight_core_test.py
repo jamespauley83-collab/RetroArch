@@ -15,6 +15,9 @@ PREFIX = 'Payload/RetroArch.app/'
 BUNDLE_ID = 'com.jamespauley.retroarchlab.eightcoretest'
 DISPLAY_NAME = 'RetroArch Lab 8 Test'
 SCHEME = 'retroarchlab8test'
+HELPER = PREFIX + 'PlugIns/RALabJITHelper.appex/'
+JIT_FRAMEWORK = PREFIX + 'Frameworks/StikJIT.framework/'
+STIKJIT_COMMIT = '32287268fa5824f9edce4cb359f5833ce0cf7b00'
 CORES = {'fceumm', 'snes9x2010', 'opera', 'dolphin', 'play',
          'mednafen_saturn', 'yabause', 'armsx2'}
 
@@ -98,6 +101,9 @@ def validate_archive(archive, manifest, isolated=False):
         raise ValueError('Expected exactly eight named cores.')
     expected = {core['name'].replace('_', '.') + '.libretro.framework' for core in manifest['cores']}
     expected.add('MoltenVK.framework')
+    jit = manifest.get('stikjit')
+    if jit:
+        expected.add('StikJIT.framework')
     actual = {name[len(PREFIX + 'Frameworks/'):].split('/')[0] for name in names
               if name.startswith(PREFIX + 'Frameworks/') and name != PREFIX + 'Frameworks/'}
     if actual != expected:
@@ -124,6 +130,41 @@ def validate_archive(archive, manifest, isolated=False):
             raise ValueError('Unresolved dynamic dependency: ' + dependency)
     molten = PREFIX + 'Frameworks/MoltenVK.framework/MoltenVK'
     reports[molten] = inspect_macho(archive.read(molten))
+    if jit:
+        if jit.get('commit') != STIKJIT_COMMIT:
+            raise ValueError('Unpinned StikJIT source.')
+        helper_info = plistlib.loads(archive.read(HELPER + 'Info.plist'))
+        if (helper_info.get('CFBundleIdentifier') != identity + '.JITHelper'
+                or jit.get('helper_bundle_id') != identity + '.JITHelper'
+                or helper_info.get('CFBundleExecutable') != 'RALabJITHelper'):
+            raise ValueError('JIT helper identity differs from the host.')
+        extension = helper_info.get('NSExtension', {})
+        if (extension.get('NSExtensionPrincipalClass') != 'RALabJITHelper'
+                or extension.get('NSExtensionPointIdentifier') != 'com.apple.ar.viewer'):
+            raise ValueError('Unexpected JIT helper entry point.')
+        for key in ('NSUbiquitousContainers', 'CFBundleDocumentTypes', 'UTExportedTypeDeclarations'):
+            if key in helper_info:
+                raise ValueError('Helper must not declare cloud or shared documents.')
+        for path, key in ((HELPER + 'RALabJITHelper', 'helper_sha256'),
+                          (JIT_FRAMEWORK + 'StikJIT', 'framework_sha256')):
+            data = archive.read(path)
+            if sha256(data) != jit.get(key):
+                raise ValueError('JIT binary checksum mismatch.')
+            reports[path] = inspect_macho(data)
+            for dependency in reports[path]['dependencies']:
+                if dependency.startswith(('/System/Library/Frameworks/', '/usr/lib/')):
+                    continue
+                if path == HELPER + 'RALabJITHelper' and dependency == '@rpath/StikJIT.framework/StikJIT':
+                    continue
+                raise ValueError('Unresolved JIT dependency: ' + dependency)
+        if reports[HELPER + 'RALabJITHelper']['minimum_ios'] != '26.0.0':
+            raise ValueError('Helper must target iOS 26.')
+        # Nothing else may add executable code inside either permitted bundle.
+        for name in names:
+            if name.startswith((HELPER, JIT_FRAMEWORK)) and name not in reports:
+                data = archive.read(name)
+                if data[:4] in (b'\xcf\xfa\xed\xfe', b'\xca\xfe\xba\xbe') or '/Frameworks/' in name[len(HELPER):] or name.endswith('.dylib'):
+                    raise ValueError('Unexpected nested JIT executable.')
     if isolated:
         if (info.get('ALTBundleIdentifier') != BUNDLE_ID or info.get('CFBundleDisplayName') != DISPLAY_NAME
                 or info.get('CFBundleURLTypes') != [{'CFBundleURLName': BUNDLE_ID, 'CFBundleURLSchemes': [SCHEME]}]):
@@ -133,7 +174,8 @@ def validate_archive(archive, manifest, isolated=False):
         if (info.get('UIFileSharingEnabled') is not True
                 or info.get('LSSupportsOpeningDocumentsInPlace') is not True):
             raise ValueError('Test app Documents must be visible in Files.')
-        if any(name.startswith(PREFIX + 'PlugIns/') for name in names):
+        if any(name.startswith(PREFIX + 'PlugIns/') and name != PREFIX + 'PlugIns/'
+               and not (jit and name.startswith(HELPER)) for name in names):
             raise ValueError('Test copy must not carry the working app widget.')
         if manifest.get('icloud_drive') != {'enabled': False, 'requires_no_cloud_entitlements': True}:
             raise ValueError('Test manifest must prohibit cloud entitlements.')
@@ -160,6 +202,8 @@ def package(artifacts, destination):
                        derivative={'input_ipa_sha256': manifest['ipa_sha256'],
                                    'packager_sha256': sha256(Path(__file__).read_bytes()),
                                    'runtime_binaries_unchanged': True, 'widget_removed': True})
+        if derived.get('stikjit'):
+            derived['stikjit']['helper_bundle_id'] = BUNDLE_ID + '.JITHelper'
         info = plistlib.loads(archive.read(PREFIX + 'Info.plist'))
         info.update(CFBundleIdentifier=BUNDLE_ID, ALTBundleIdentifier=BUNDLE_ID,
                     CFBundleDisplayName=DISPLAY_NAME, CFBundleName=DISPLAY_NAME,
@@ -169,11 +213,18 @@ def package(artifacts, destination):
             info.pop(key, None)
         replacements = {PREFIX + 'Info.plist': plistlib.dumps(info),
                         PREFIX + 'retroarch-lab-build.json': (json.dumps(derived, indent=2) + '\n').encode()}
+        if derived.get('stikjit'):
+            helper_info = plistlib.loads(archive.read(HELPER + 'Info.plist'))
+            helper_info['CFBundleIdentifier'] = BUNDLE_ID + '.JITHelper'
+            replacements[HELPER + 'Info.plist'] = plistlib.dumps(helper_info)
         ipa = destination / 'RetroArch-Lab-8-Test-unsigned.ipa'
         with zipfile.ZipFile(ipa, 'w') as output:
             for entry in archive.infolist():
-                if entry.filename.startswith((PREFIX + 'PlugIns/', PREFIX + '_CodeSignature/')):
+                if entry.filename.startswith(PREFIX + '_CodeSignature/'):
                     continue
+                if entry.filename.startswith(PREFIX + 'PlugIns/'):
+                    if not (derived.get('stikjit') and entry.filename.startswith(HELPER)):
+                        continue
                 output.writestr(copy.copy(entry), replacements.get(entry.filename, archive.read(entry.filename)))
         with zipfile.ZipFile(ipa) as output:
             validate_archive(output, derived, isolated=True)

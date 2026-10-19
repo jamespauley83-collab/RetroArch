@@ -3,12 +3,16 @@ name: RetroArch Lab iPad
 on:
   workflow_dispatch:
     inputs:
+      with_stikjit:
+        description: Embed built-in StikJIT (requires with_armsx2)
+        type: boolean
+        default: false
       with_armsx2:
         description: Include ARMSX2 as the preferred PS2 core alongside Play!
         type: boolean
         default: false
   push:
-    branches: [codex/ipad-retroarch-lab]
+    branches: [codex/ipad-retroarch-lab, codex/ipad-lab-builtin-jit]
     paths:
       - 'pkg/apple/ipad-lab/**'
       - 'ui/drivers/cocoa/**'
@@ -36,7 +40,7 @@ concurrency:
 
 jobs:
   build:
-    if: github.repository == 'jamespauley83-collab/RetroArch'
+    if: github.repository == 'jamespauley83-collab/RetroArch' && (github.event_name != 'pull_request' || github.head_ref != 'codex/ipad-lab-builtin-jit')
     runs-on: macos-15
     timeout-minutes: 120
     steps:
@@ -44,8 +48,11 @@ jobs:
         with:
           persist-credentials: false
       - name: Select Xcode 26 for ARMSX2
-        if: github.event_name == 'pull_request' || inputs.with_armsx2
+        if: github.event_name == 'pull_request' || inputs.with_armsx2 || github.ref == 'refs/heads/codex/ipad-lab-builtin-jit'
         run: echo 'DEVELOPER_DIR=/Applications/Xcode_26.3.app/Contents/Developer' >> "$GITHUB_ENV"
+      - name: Install XcodeGen for the JIT helper
+        if: inputs.with_stikjit || github.ref == 'refs/heads/codex/ipad-lab-builtin-jit'
+        run: command -v xcodegen >/dev/null || brew install xcodegen
       - name: Validate build inputs and packaging checks
         run: |
           python3 pkg/apple/ipad-lab/build.py --check
@@ -59,26 +66,28 @@ jobs:
           make clean
           make check ICLOUD_DRIVE_CONTAINER=iCloud.com.jamespauley.retroarchlab
       - uses: actions/checkout@v6
-        if: github.event_name == 'pull_request' || inputs.with_armsx2
+        if: github.event_name == 'pull_request' || inputs.with_armsx2 || github.ref == 'refs/heads/codex/ipad-lab-builtin-jit'
         with:
           repository: ARMSX2/ARMSX2
           ref: e58489d349cdcd635fc6264546087e347c84bf8c
           path: .armsx2-prototype/source
           persist-credentials: false
       - name: Build and validate the optional ARMSX2 core
-        if: github.event_name == 'pull_request' || inputs.with_armsx2
+        if: github.event_name == 'pull_request' || inputs.with_armsx2 || github.ref == 'refs/heads/codex/ipad-lab-builtin-jit'
         run: |
           python3 -m unittest discover -s pkg/apple/ipad-lab/experiments/armsx2 -p 'test_*.py' -v
           bash pkg/apple/ipad-lab/experiments/armsx2/build.sh device-test
       - name: Build cores and iPad app
         env:
-          WITH_ARMSX2: ${{ github.event_name == 'pull_request' || inputs.with_armsx2 }}
+          WITH_STIKJIT: ${{ inputs.with_stikjit || github.ref == 'refs/heads/codex/ipad-lab-builtin-jit' }}
+          WITH_ARMSX2: ${{ github.event_name == 'pull_request' || inputs.with_armsx2 || github.ref == 'refs/heads/codex/ipad-lab-builtin-jit' }}
         run: |
           args=()
           if [ "$WITH_ARMSX2" = true ]; then args+=(--with-armsx2); fi
+          if [ "$WITH_STIKJIT" = true ]; then args+=(--with-stikjit); fi
           python3 -u pkg/apple/ipad-lab/build.py "${args[@]}"
       - name: Package separate eight-core device-test copy
-        if: github.event_name == 'pull_request' || inputs.with_armsx2
+        if: github.event_name == 'pull_request' || inputs.with_armsx2 || github.ref == 'refs/heads/codex/ipad-lab-builtin-jit'
         run: |
           for artifact_dir in .ipad-lab-build/*/artifacts; do
             python3 pkg/apple/ipad-lab/package_eight_core_test.py "$artifact_dir" "$artifact_dir/eight-core-test"

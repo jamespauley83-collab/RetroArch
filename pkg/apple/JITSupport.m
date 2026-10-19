@@ -570,6 +570,10 @@ static int connect_bounded(int fd, const struct sockaddr *sa, socklen_t len,
 
 static void exec_mem_request_remote_bless(void)
 {
+#ifdef HAVE_RETROARCH_LAB_STIKJIT
+   /* The Lab coordinator owns activation; do not race a LAN helper. */
+   return;
+#endif
    static RABlessClient  *client = nil;
    static dispatch_once_t once   = 0;
 

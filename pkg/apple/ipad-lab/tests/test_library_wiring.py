@@ -16,7 +16,9 @@ class LibraryWiringTests(unittest.TestCase):
 
     def test_objc_build_includes_screen_only_for_lab_ios(self):
         self.assertIn('#if defined(HAVE_RETROARCH_LAB_LIBRARY) && TARGET_OS_IOS\n'
-                      '#include "../ui/drivers/cocoa/RetroArchLabLibrary.m"',
+                      '#ifdef HAVE_RETROARCH_LAB_STIKJIT\n'
+                      '#include "../ui/drivers/cocoa/RetroArchLabJIT.m"\n'
+                      '#endif\n#include "../ui/drivers/cocoa/RetroArchLabLibrary.m"',
                       read('griffin/griffin_objc.m'))
 
     def test_library_never_uses_filename_core_guessing(self):
@@ -60,7 +62,7 @@ class LibraryWiringTests(unittest.TestCase):
 
     def test_armsx2_uses_core_arena_check_instead_of_generic_library_jit_gate(self):
         source = read('ui/drivers/cocoa/RetroArchLabLibrary.m')
-        launch = source.split('NSString *identifier = RALabCoreIdentifier(core);')[1]
+        launch = source.rsplit('NSString *identifier = RALabCoreIdentifier(core);', 1)[1]
         gate = launch.split('if (!retroarch_ctl')[0]
         self.assertIn('!jit_available()', gate)
         self.assertIn('@"dolphin"', gate)

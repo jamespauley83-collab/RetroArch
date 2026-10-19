@@ -1,0 +1,44 @@
+name: RALabJITHelper
+options:
+  deploymentTarget:
+    iOS: "26.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    CODE_SIGNING_ALLOWED: NO
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  RALabJITHelper:
+    type: app-extension
+    platform: iOS
+    sources: [Helper.swift]
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: Lab JIT Helper
+        NSExtension:
+          NSExtensionAttributes:
+            NSExtensionActivationRule: FALSEPREDICATE
+          NSExtensionPointIdentifier: com.apple.ar.viewer
+          NSExtensionPrincipalClass: RALabJITHelper
+          NSExtensionContextClass: NSExtensionContext
+          NSExtensionContextHostClass: NSExtensionContext
+        XPCService:
+          ServiceType: Application
+          _MultipleInstances: true
+          _ProcessType: App
+    dependencies:
+      - framework: StikJIT.framework
+        embed: false
+      - sdk: Foundation.framework
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(LAB_HOST_ID).JITHelper
+        LD_RUNPATH_SEARCH_PATHS: $(inherited) @executable_path/../../Frameworks
+        APPLICATION_EXTENSION_API_ONLY: YES
+schemes:
+  RALabJITHelper:
+    build:
+      targets:
+        RALabJITHelper: all
