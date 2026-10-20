@@ -196,6 +196,7 @@ extern CFTypeRef SecTaskCopyValueForEntitlement(CFTypeRef task, CFStringRef enti
 - (void)finish:(BOOL)success message:(NSString *)message generation:(NSUInteger)generation
 {
    if (!self.busy || generation != self.generation) return;
+   exec_mem_end_builtin_jit();
    [self.timer invalidate]; self.timer = nil;
    self.busy = NO;
    [self.helper setRequestCompletionBlock:nil];
@@ -236,9 +237,17 @@ extern CFTypeRef SecTaskCopyValueForEntitlement(CFTypeRef task, CFStringRef enti
    if (self.busy) { if (completion) completion(NO); return; }
    BOOL enabling = [operation isEqualToString:@"enable"];
    BOOL builtin = !enabling || [[self method] isEqualToString:@"builtin"];
-   if (enabling && exec_mem_pool_init()) { if (completion) completion(YES); return; }
+   if (builtin && !exec_mem_begin_builtin_jit())
+   {
+      if (completion) completion(NO);
+      [self message:@"A network JIT activation is still finishing or its result is unknown. Wait, then retry. If it stays blocked, close and reopen this test app." from:presenter];
+      return;
+   }
+   if (enabling && exec_mem_pool_init())
+   { if (builtin) exec_mem_end_builtin_jit(); if (completion) completion(YES); return; }
    NSString *problem = [self preflight:builtin];
-   if (problem) { if (completion) completion(NO); [self message:problem from:presenter]; return; }
+   if (problem)
+   { if (builtin) exec_mem_end_builtin_jit(); if (completion) completion(NO); [self message:problem from:presenter]; return; }
    self.presenter = presenter;
    self.busy = YES; self.enabling = enabling; self.abandoned = NO; self.poolReady = NO;
    self.completion = completion;

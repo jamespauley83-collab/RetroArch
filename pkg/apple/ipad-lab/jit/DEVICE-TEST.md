@@ -47,6 +47,14 @@ This new build requires its own JIT activation checks:
   allowed to finish; if it stalls, close/reopen the test app before retrying.
 - With VPN disconnected, verify an actionable error and no game launch; reconnect
   and retry. Check missing pairing, unavailable helper, and StikDebug fallback.
+- With an available LAN bless helper, verify StikDebug and Wait for debugger can
+  still activate. Select Built-in StikJIT and confirm that a new activation or
+  Check setup does not start LAN discovery; verify external activation again
+  after switching back.
+- Cancel an external activation while its LAN helper is connecting or waiting
+  for a reply, then select Built-in. Verify the app requests a retry instead of
+  starting both helpers. If a sent LAN request has no definite reply, relaunch
+  the test app before trying another activation method.
 - Confirm Saturn still opens without JIT, and working Lab remains intact.
 
 Activation completion requires a prepared executable-memory pool. A helper success

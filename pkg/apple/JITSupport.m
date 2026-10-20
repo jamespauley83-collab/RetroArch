@@ -105,7 +105,70 @@ bool jb_enable_ptrace_hack(void) {
 }
 #endif /* !TARGET_OS_TV */
 
+#ifdef HAVE_RETROARCH_LAB_STIKJIT
+enum { RA_LAB_JIT_IDLE, RA_LAB_JIT_BUILTIN, RA_LAB_JIT_REMOTE,
+       RA_LAB_JIT_REMOTE_UNCERTAIN };
+static unsigned s_lab_jit_owner = RA_LAB_JIT_IDLE;
+
+bool exec_mem_begin_builtin_jit(void)
+{
+   unsigned expected = RA_LAB_JIT_IDLE;
+   return __atomic_compare_exchange_n(&s_lab_jit_owner, &expected,
+         RA_LAB_JIT_BUILTIN, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+}
+
+void exec_mem_end_builtin_jit(void)
+{
+   unsigned expected = RA_LAB_JIT_BUILTIN;
+   __atomic_compare_exchange_n(&s_lab_jit_owner, &expected,
+         RA_LAB_JIT_IDLE, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+}
+#endif
+
 #if !TARGET_OS_SIMULATOR
+static bool remote_bless_allowed(void)
+{
+#ifdef HAVE_RETROARCH_LAB_STIKJIT
+   const char *method = [[NSUserDefaults.standardUserDefaults
+      stringForKey:@"RALabJITMethod"] UTF8String];
+   unsigned owner = __atomic_load_n(&s_lab_jit_owner, __ATOMIC_SEQ_CST);
+   if (owner == RA_LAB_JIT_BUILTIN || owner == RA_LAB_JIT_REMOTE_UNCERTAIN || !method)
+      return false;
+   return strcmp(method, "stikdebug") == 0 || strcmp(method, "external") == 0;
+#else
+   return true;
+#endif
+}
+
+static void remote_bless_release(bool uncertain)
+{
+#ifdef HAVE_RETROARCH_LAB_STIKJIT
+   unsigned expected = RA_LAB_JIT_REMOTE;
+   __atomic_compare_exchange_n(&s_lab_jit_owner, &expected,
+         uncertain ? RA_LAB_JIT_REMOTE_UNCERTAIN : RA_LAB_JIT_IDLE,
+         false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+#else
+   (void)uncertain;
+#endif
+}
+
+static bool remote_bless_acquire(void)
+{
+#ifdef HAVE_RETROARCH_LAB_STIKJIT
+   unsigned expected = RA_LAB_JIT_IDLE;
+   if (!remote_bless_allowed() ||
+         !__atomic_compare_exchange_n(&s_lab_jit_owner, &expected,
+            RA_LAB_JIT_REMOTE, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST))
+      return false;
+   if (!remote_bless_allowed())
+   {
+      remote_bless_release(false);
+      return false;
+   }
+#endif
+   return true;
+}
+
 static bool device_has_txm(void)
 {
    static bool has_txm = false;
@@ -230,7 +293,7 @@ static bool bless_executable_region(void *ptr, size_t size)
 
 /* Tell the debugger to detach. Uses the universal.js protocol:
  * brk #0xf00d with x16=0 (CMD_DETACH). */
-static void detach_debugger(void)
+static bool detach_debugger(void)
 {
 #ifdef __arm64__
    struct sigaction prev, act = {};
@@ -245,6 +308,9 @@ static void detach_debugger(void)
       ::: "x16", "memory"
    );
    sigaction(SIGTRAP, &prev, NULL);
+   return !s_brk_trapped;
+#else
+   return false;
 #endif
 }
 
@@ -388,11 +454,26 @@ static bool remote_bless_done(void)
 }
 
 /* Called once the service says it has attached. */
-static bool remote_bless_finish(void)
+static bool remote_bless_finish(BOOL *uncertain)
 {
+   if (!remote_bless_allowed())
+   {
+      *uncertain = !detach_debugger();
+      return false;
+   }
    if (requires_dual_map())
-      return exec_mem_pool_init();
-   detach_debugger();
+   {
+      if (exec_mem_pool_init())
+      {
+         *uncertain = NO;
+         return true;
+      }
+      *uncertain = !detach_debugger();
+      return false;
+   }
+   *uncertain = !detach_debugger();
+   if (*uncertain)
+      return false;
    RARCH_LOG("[JIT] Debugger detached; JIT is available\n");
    return true;
 }
@@ -402,6 +483,7 @@ static bool remote_bless_finish(void)
 @property (nonatomic, strong) NSNetServiceBrowser *browser;
 @property (nonatomic, strong) NSMutableArray<NSNetService *> *pending;
 @property (nonatomic, strong) dispatch_queue_t asks;
+- (BOOL)ask:(NSArray<NSData *> *)addresses uncertain:(BOOL *)uncertain;
 @end
 
 @implementation RABlessClient
@@ -411,8 +493,9 @@ static bool remote_bless_finish(void)
    self.pending = [NSMutableArray array];
    self.browser = [[NSNetServiceBrowser alloc] init];
    self.browser.delegate = self;
-   [self.browser searchForServicesOfType:RA_BLESS_SERVICE_TYPE
-                                inDomain:@"local."];
+   if (remote_bless_allowed())
+      [self.browser searchForServicesOfType:RA_BLESS_SERVICE_TYPE
+                                   inDomain:@"local."];
    [self scheduleRetry];
    RARCH_LOG("[JIT] Looking for a bless service on the network\n");
 }
@@ -421,6 +504,8 @@ static bool remote_bless_finish(void)
            didFindService:(NSNetService *)service
                moreComing:(BOOL)moreComing
 {
+   if (!remote_bless_allowed())
+      return;
    RARCH_LOG("[JIT] Found bless service \"%s\"; resolving\n",
              service.name.UTF8String);
    [self.pending addObject:service];
@@ -445,9 +530,16 @@ static bool remote_bless_finish(void)
       self.asks = dispatch_queue_create("com.retroarch.bless",
                                         DISPATCH_QUEUE_SERIAL);
    dispatch_async(self.asks, ^{
-      if (remote_bless_done())
+      if (!remote_bless_allowed() || remote_bless_done() || !remote_bless_acquire())
          return;
-      if ([self ask:addresses] && remote_bless_finish())
+      __block BOOL uncertain = NO;
+      __block BOOL ready = NO;
+      if ([self ask:addresses uncertain:&uncertain])
+         dispatch_sync(dispatch_get_main_queue(), ^{
+            ready = remote_bless_finish(&uncertain);
+         });
+      remote_bless_release(uncertain);
+      if (ready)
          dispatch_async(dispatch_get_main_queue(), ^{
             [self.browser stop];
             RARCH_LOG("[JIT] Stopped looking for a bless service\n");
@@ -469,8 +561,9 @@ static bool remote_bless_finish(void)
          return;
       RARCH_LOG("[JIT] Still no bless service; looking again\n");
       [self_.browser stop];
-      [self_.browser searchForServicesOfType:RA_BLESS_SERVICE_TYPE
-                                    inDomain:@"local."];
+      if (remote_bless_allowed())
+         [self_.browser searchForServicesOfType:RA_BLESS_SERVICE_TYPE
+                                       inDomain:@"local."];
       [self_ scheduleRetry];
    });
 }
@@ -515,8 +608,9 @@ static int connect_bounded(int fd, const struct sockaddr *sa, socklen_t len,
 }
 
 /* Ask the service to attach to us, and wait for it to confirm. */
-- (BOOL)ask:(NSArray<NSData *> *)addresses
+- (BOOL)ask:(NSArray<NSData *> *)addresses uncertain:(BOOL *)uncertain
 {
+   *uncertain = NO;
    NSString *bundle = [[NSBundle mainBundle] bundleIdentifier] ?: @"";
    NSString *req    = [NSString stringWithFormat:
       @"{\"version\":%d,\"bundle_id\":\"%@\",\"pid\":%d}\n",
@@ -525,6 +619,8 @@ static int connect_bounded(int fd, const struct sockaddr *sa, socklen_t len,
 
    for (NSData *addr in addresses)
    {
+      if (!remote_bless_allowed())
+         return NO;
       int fd = socket(((const struct sockaddr *)addr.bytes)->sa_family,
                       SOCK_STREAM, 0);
       if (fd < 0)
@@ -536,8 +632,7 @@ static int connect_bounded(int fd, const struct sockaddr *sa, socklen_t len,
 
       if (connect_bounded(fd, (const struct sockaddr *)addr.bytes,
                           (socklen_t)addr.length,
-                          RA_BLESS_CONNECT_TIMEOUT) != 0
-          || send(fd, out, strlen(out), 0) < 0)
+                          RA_BLESS_CONNECT_TIMEOUT) != 0)
       {
          RARCH_WARN("[JIT] Bless service unreachable at one address: %s\n",
                     strerror(errno));
@@ -545,21 +640,75 @@ static int connect_bounded(int fd, const struct sockaddr *sa, socklen_t len,
          continue;
       }
 
-      char reply[256] = {0};
-      ssize_t got = recv(fd, reply, sizeof(reply) - 1, 0);
-      close(fd);
-      if (got <= 0)
+      if (!remote_bless_allowed())
       {
-         RARCH_WARN("[JIT] Bless service did not answer\n");
+         close(fd);
+         return NO;
+      }
+      ssize_t sent = send(fd, out, strlen(out), 0);
+      if (sent < 0)
+      {
+         close(fd);
          continue;
       }
+      *uncertain = sent > 0;
+      if ((size_t)sent != strlen(out))
+      {
+         close(fd);
+         return NO;
+      }
 
+      char reply[256] = {0};
+      size_t received = 0;
+      bool complete = false;
+      NSDate *replyDeadline = [NSDate dateWithTimeIntervalSinceNow:RA_BLESS_REPLY_TIMEOUT];
+      while (received < sizeof(reply) - 1)
+      {
+         NSTimeInterval remaining = [replyDeadline timeIntervalSinceNow];
+         if (remaining <= 0)
+            break;
+         struct timeval timeout = { (long)remaining,
+            (int)((remaining - (long)remaining) * 1000000) };
+         if (timeout.tv_sec == 0 && timeout.tv_usec == 0)
+            timeout.tv_usec = 1;
+         if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) != 0)
+            break;
+         ssize_t got = recv(fd, reply + received, sizeof(reply) - 1 - received, 0);
+         if (got <= 0)
+         {
+            complete = got == 0;
+            break;
+         }
+         received += (size_t)got;
+         if (memchr(reply, '\n', received))
+         {
+            complete = true;
+            break;
+         }
+      }
+      close(fd);
+      if (!complete || received == 0)
+      {
+         RARCH_WARN("[JIT] Bless service did not answer\n");
+         return NO;
+      }
+
+      id response = [NSJSONSerialization JSONObjectWithData:
+            [NSData dataWithBytes:reply length:received] options:0 error:NULL];
+      id ok = [response isKindOfClass:NSDictionary.class] ? response[@"ok"] : nil;
+      if (![ok isKindOfClass:NSNumber.class] ||
+            CFGetTypeID((__bridge CFTypeRef)ok) != CFBooleanGetTypeID())
+      {
+         RARCH_WARN("[JIT] Bless service returned an invalid reply\n");
+         return NO;
+      }
       /* The service attached before answering, so a brk is safe now. */
-      if (strstr(reply, "\"ok\": true") || strstr(reply, "\"ok\":true"))
+      if ([ok boolValue])
       {
          RARCH_LOG("[JIT] Bless service attached\n");
          return YES;
       }
+      *uncertain = NO;
       RARCH_WARN("[JIT] Bless service declined: %s\n", reply);
       return NO;
    }
@@ -570,16 +719,12 @@ static int connect_bounded(int fd, const struct sockaddr *sa, socklen_t len,
 
 static void exec_mem_request_remote_bless(void)
 {
-#ifdef HAVE_RETROARCH_LAB_STIKJIT
-   /* The Lab coordinator owns activation; do not race a LAN helper. */
-   return;
-#endif
    static RABlessClient  *client = nil;
    static dispatch_once_t once   = 0;
 
    /* Otherwise App Store builds ask for local network access to look for a
     * helper that could never attach to them anyway. */
-   if (!jit_possible())
+   if (!remote_bless_allowed() || !jit_possible())
       return;
 
    dispatch_once(&once, ^{
