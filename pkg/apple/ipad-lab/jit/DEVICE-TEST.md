@@ -68,7 +68,17 @@ attempts until it exits or the app is restarted.
 Compilation and package checks are separate from signing and physical-device
 acceptance. Do not merge or replace working Lab based on compilation alone.
 
-## Build verification — October 19, 2026
+## Current build verification — October 23, 2026
+
+[CI run 39358107713](https://github.com/jamespauley83-collab/RetroArch/actions/runs/39358107713)
+successfully built runtime commit `0aee453003166f9ca163705fe58027f687a4d922`,
+including native Apple SDK compilation of the LAN fallback coordination changes.
+The October 23 local rerun also passed all 66 Lab and 12 ARMSX2 tests.
+
+Host/helper provisioning, signatures, and physical-device JIT acceptance remain
+unverified. Keep the PR draft until the focused acceptance checks above pass.
+
+## Earlier build verification — October 19, 2026
 
 [CI run 39180567671](https://github.com/jamespauley83-collab/RetroArch/actions/runs/39180567671)
 successfully built runtime commit `dbe80de88a5dd0535b76f8a7a6a0a2577c6fc013`
