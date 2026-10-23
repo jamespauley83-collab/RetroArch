@@ -53,8 +53,11 @@ This new build requires its own JIT activation checks:
   after switching back.
 - Cancel an external activation while its LAN helper is connecting or waiting
   for a reply, then select Built-in. Verify the app requests a retry instead of
-  starting both helpers. If a sent LAN request has no definite reply, relaunch
-  the test app before trying another activation method.
+  starting both helpers.
+- With a sent LAN request receiving no definite reply, confirm the `result is
+  unknown` message and that repeated Built-in retries remain blocked without a
+  late game launch. Close and reopen the test app; verify Built-in activation
+  can be attempted again in the new process.
 - Confirm Saturn still opens without JIT, and working Lab remains intact.
 
 Activation completion requires a prepared executable-memory pool. A helper success
