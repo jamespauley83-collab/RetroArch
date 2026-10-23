@@ -40,6 +40,9 @@
 #include "../ui/drivers/cocoa/RetroArchPlaylistManager.m"
 #endif
 #if defined(HAVE_RETROARCH_LAB_LIBRARY) && TARGET_OS_IOS
+#ifdef HAVE_RETROARCH_LAB_STIKJIT
+#include "../ui/drivers/cocoa/RetroArchLabJIT.m"
+#endif
 #include "../ui/drivers/cocoa/RetroArchLabLibrary.m"
 #endif
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)

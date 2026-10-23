@@ -3,6 +3,9 @@
 #include <math.h>
 #import "apple_platform.h"
 #import "RetroArchLabLibrary.h"
+#ifdef HAVE_RETROARCH_LAB_STIKJIT
+#import "RetroArchLabJIT.h"
+#endif
 #import "RetroArchLabLibrarySupport.h"
 #import "RetroArchPlaylistManager.h"
 #import "cocoa_common.h"
@@ -123,6 +126,11 @@ bool cocoa_lab_library_visible(void) { return ra_lab_library_visible; }
          UIBarButtonSystemItemRefresh target:self action:@selector(reloadLibrary)];
    refresh.accessibilityLabel = @"Refresh game library";
    self.navigationItem.rightBarButtonItems = @[advanced, refresh];
+#ifdef HAVE_RETROARCH_LAB_STIKJIT
+   UIBarButtonItem *jit = [[UIBarButtonItem alloc] initWithTitle:@"JIT Setup"
+         style:UIBarButtonItemStylePlain target:self action:@selector(openJITSetup)];
+   self.navigationItem.rightBarButtonItems = @[advanced, jit, refresh];
+#endif
    if (!retroarch_ctl(RARCH_CTL_IS_DUMMY_CORE, NULL))
       self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Resume"
             style:UIBarButtonItemStylePlain target:self action:@selector(resumeGame)];
@@ -348,7 +356,24 @@ bool cocoa_lab_library_visible(void) { return ra_lab_library_visible; }
          command_event(CMD_EVENT_MENU_TOGGLE, NULL);
    }];
 }
+#ifdef HAVE_RETROARCH_LAB_STIKJIT
+- (void)openJITSetup { [[RALabJIT shared] showSettingsFrom:self]; }
+#endif
 - (void)launchPath:(NSString *)path core:(NSString *)core
+{
+#ifdef HAVE_RETROARCH_LAB_STIKJIT
+   NSString *identifier = RALabCoreIdentifier(core);
+   if ([@[@"armsx2", @"dolphin", @"play"] containsObject:identifier])
+   {
+      [[RALabJIT shared] enableFrom:self completion:^(BOOL ready) {
+         if (ready && self.view.window && !self.leaving) [self queuePath:path core:core];
+      }];
+      return;
+   }
+#endif
+   [self queuePath:path core:core];
+}
+- (void)queuePath:(NSString *)path core:(NSString *)core
 {
    [self dismissLibrary:^{
       content_ctx_info_t info = {0};
@@ -396,6 +421,7 @@ bool cocoa_lab_library_visible(void) { return ra_lab_library_visible; }
    if (!core)
    { [self showProblem:@"Assign an installed core to this game or playlist in Advanced. The library will not guess a console from .iso or .chd."]; return; }
    NSString *identifier = RALabCoreIdentifier(core);
+#ifndef HAVE_RETROARCH_LAB_STIKJIT
    /* ARMSX2 checks and allocates its required arena in retro_load_game. */
    if (([identifier isEqualToString:@"dolphin"] || [identifier isEqualToString:@"play"]) && !jit_available())
    {
@@ -405,6 +431,7 @@ bool cocoa_lab_library_visible(void) { return ra_lab_library_visible; }
             name, bundle.bundleIdentifier ?: @"unknown app ID"]];
       return;
    }
+#endif
    if (!retroarch_ctl(RARCH_CTL_IS_DUMMY_CORE, NULL))
    {
       UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Switch games?"

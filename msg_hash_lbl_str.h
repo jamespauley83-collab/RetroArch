@@ -1223,6 +1223,7 @@
 #define MENU_ENUM_LABEL_INPUT_TURBO_PERIOD_STR "input_turbo_period"
 #define MENU_ENUM_LABEL_INPUT_UNIFIED_MENU_CONTROLS_STR "unified_menu_controls"
 #define MENU_ENUM_LABEL_JOYPAD_AUTOCONFIG_DIR_STR "joypad_autoconfig_dir"
+#define MENU_ENUM_LABEL_LAB_JIT_SETUP_STR "lab_jit_setup"
 #define MENU_ENUM_LABEL_LAKKA_SERVICES_STR "lakka_services"
 #define MENU_ENUM_LABEL_LAKKA_SWITCH_OPTIONS_STR "Switch_Options"
 #define MENU_ENUM_LABEL_LATENCY_SETTINGS_STR "latency_settings"

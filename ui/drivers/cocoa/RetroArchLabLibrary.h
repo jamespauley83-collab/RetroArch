@@ -4,4 +4,5 @@
 #include <stdbool.h>
 bool cocoa_lab_library_visible(void);
 void cocoa_lab_show_library(void);
+void cocoa_lab_show_jit_settings(void);
 #endif

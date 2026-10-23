@@ -16,3 +16,11 @@ xcrun --sdk iphoneos clang -fsyntax-only -fobjc-arc \
   -Werror=implicit-function-declaration -Werror=objc-method-access \
   ui/drivers/cocoa/RetroArchLabLibrary.m
 printf 'Native iOS library screen type-check passed\n'
+
+xcrun --sdk iphoneos clang -fsyntax-only -fobjc-arc \
+  -target arm64-apple-ios26.0 -isysroot "$sdk" \
+  -DHAVE_COCOATOUCH -DHAVE_MENU -DHAVE_RETROARCH_LAB_LIBRARY -DHAVE_RETROARCH_LAB_STIKJIT \
+  -I. -Ilibretro-common/include -Ipkg/apple \
+  -include ui/drivers/cocoa/cocoa_common.h \
+  -Werror=implicit-function-declaration -Werror=objc-method-access \
+  ui/drivers/cocoa/RetroArchLabLibrary.m ui/drivers/cocoa/RetroArchLabJIT.m
