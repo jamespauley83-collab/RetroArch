@@ -3,6 +3,9 @@
 #include <math.h>
 #import "apple_platform.h"
 #import "RetroArchLabLibrary.h"
+#ifdef HAVE_RETROARCH_LAB_RPCS3
+#import "RetroArchLabRPCS3.h"
+#endif
 #ifdef HAVE_RETROARCH_LAB_STIKJIT
 #import "RetroArchLabJIT.h"
 #endif
@@ -130,6 +133,11 @@ bool cocoa_lab_library_visible(void) { return ra_lab_library_visible; }
    UIBarButtonItem *jit = [[UIBarButtonItem alloc] initWithTitle:@"JIT Setup"
          style:UIBarButtonItemStylePlain target:self action:@selector(openJITSetup)];
    self.navigationItem.rightBarButtonItems = @[advanced, jit, refresh];
+#endif
+#ifdef HAVE_RETROARCH_LAB_RPCS3
+   UIBarButtonItem *ps3 = [[UIBarButtonItem alloc] initWithTitle:@"PS3"
+         style:UIBarButtonItemStylePlain target:self action:@selector(openPS3)];
+   self.navigationItem.rightBarButtonItems = [self.navigationItem.rightBarButtonItems arrayByAddingObject:ps3];
 #endif
    if (!retroarch_ctl(RARCH_CTL_IS_DUMMY_CORE, NULL))
       self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Resume"
@@ -359,8 +367,20 @@ bool cocoa_lab_library_visible(void) { return ra_lab_library_visible; }
 #ifdef HAVE_RETROARCH_LAB_STIKJIT
 - (void)openJITSetup { [[RALabJIT shared] showSettingsFrom:self]; }
 #endif
+#ifdef HAVE_RETROARCH_LAB_RPCS3
+- (void)openPS3
+{
+   if (!retroarch_ctl(RARCH_CTL_IS_DUMMY_CORE, NULL))
+   { [self showProblem:@"Close the running game in Advanced before opening PS3."]; return; }
+   RALabShowRPCS3(self);
+}
+#endif
 - (void)launchPath:(NSString *)path core:(NSString *)core
 {
+#ifdef HAVE_RETROARCH_LAB_RPCS3
+   if (RALabRPCS3Loaded())
+   { [self showProblem:@"Restart this test app before switching from PS3 to another system."]; return; }
+#endif
 #ifdef HAVE_RETROARCH_LAB_STIKJIT
    NSString *identifier = RALabCoreIdentifier(core);
    if ([@[@"armsx2", @"dolphin", @"play"] containsObject:identifier])
