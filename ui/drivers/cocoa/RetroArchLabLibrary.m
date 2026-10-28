@@ -352,6 +352,10 @@ bool cocoa_lab_library_visible(void) { return ra_lab_library_visible; }
 }
 - (void)openAdvanced
 {
+#ifdef HAVE_RETROARCH_LAB_RPCS3
+   if (RALabRPCS3Loaded())
+   { [self showProblem:@"Restart this test app before switching from PS3 to Advanced."]; return; }
+#endif
    [self dismissLibrary:^{
       if (!(menu_state_get_ptr()->flags & MENU_ST_FLAG_ALIVE))
          command_event(CMD_EVENT_MENU_TOGGLE, NULL);
@@ -365,7 +369,14 @@ bool cocoa_lab_library_visible(void) { return ra_lab_library_visible; }
    }];
 }
 #ifdef HAVE_RETROARCH_LAB_STIKJIT
-- (void)openJITSetup { [[RALabJIT shared] showSettingsFrom:self]; }
+- (void)openJITSetup
+{
+#ifdef HAVE_RETROARCH_LAB_RPCS3
+   if (RALabRPCS3Loaded())
+   { [self showProblem:@"PS3 JIT is prepared. Restart this test app before preparing another system."]; return; }
+#endif
+   [[RALabJIT shared] showSettingsFrom:self];
+}
 #endif
 #ifdef HAVE_RETROARCH_LAB_RPCS3
 - (void)openPS3

@@ -25,6 +25,21 @@ static NSString *RALabPS3Error(int status)
    return [NSString stringWithFormat:@"RPCS3 error %d: %@", status,
          RALabPS3String(ra_ps3_api.last_error())];
 }
+static BOOL RALabPS3ProfileReady(void)
+{
+   NSString *path = [NSBundle.mainBundle pathForResource:@"embedded" ofType:@"mobileprovision"];
+   NSData *data = path ? [NSData dataWithContentsOfFile:path] : nil;
+   NSString *text = data ? [[NSString alloc] initWithData:data encoding:NSISOLatin1StringEncoding] : nil;
+   if (!text) return NO;
+   NSRange start = [text rangeOfString:@"<plist"], end = [text rangeOfString:@"</plist>"];
+   if (start.location == NSNotFound || end.location == NSNotFound || end.location <= start.location) return NO;
+   NSData *xml = [[text substringWithRange:NSMakeRange(start.location, NSMaxRange(end) - start.location)] dataUsingEncoding:NSISOLatin1StringEncoding];
+   NSDictionary *profile = [NSPropertyListSerialization propertyListWithData:xml options:0 format:nil error:nil];
+   NSDictionary *entitlements = [profile isKindOfClass:NSDictionary.class] ? profile[@"Entitlements"] : nil;
+   return [entitlements[@"get-task-allow"] boolValue] &&
+         [entitlements[@"com.apple.developer.kernel.extended-virtual-addressing"] boolValue] &&
+         [entitlements[@"com.apple.developer.kernel.increased-memory-limit"] boolValue];
+}
 static void RALabPS3Main(void *context, rpcs3_ios_main_thread_task task, void *payload)
 {
    (void)context;
@@ -153,7 +168,7 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
          [layout.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-8],
          [layout.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:12],
          [layout.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-12],
-         [self.surface.heightAnchor constraintEqualToAnchor:self.surface.widthAnchor multiplier:9.0/16.0],
+         [self.surface.heightAnchor constraintLessThanOrEqualToAnchor:self.surface.widthAnchor multiplier:9.0/16.0],
          [self.controls.heightAnchor constraintEqualToConstant:88]]];
    NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
    [center addObserver:self selector:@selector(background) name:UIApplicationWillResignActiveNotification object:nil];
@@ -197,6 +212,10 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
 - (void)startCore
 {
    if (self.busy || ra_ps3_ready || ra_ps3_failed) return;
+#if !TARGET_OS_SIMULATOR
+   if (!RALabPS3ProfileReady())
+   { self.status.text = @"Sign this test app with Extended Virtual Addressing, Increased Memory Limit and development debugging enabled before starting PS3."; return; }
+#endif
    if (!exec_mem_begin_builtin_jit())
    { self.status.text = @"Another JIT request is active. Restart this test app before preparing PS3."; return; }
    self.busy = YES; self.status.text = @"Checking PS3 JIT and loading XITRIX 0.12…";
@@ -237,7 +256,11 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
                   config.cache_path = cachePath.fileSystemRepresentation;
                   config.main_thread_callback = RALabPS3Main; config.log_callback = RALabPS3Log;
                   int status = ra_ps3_api.initialize(&config);
-                  if (status) failure = RALabPS3Error(status); else ready = YES;
+                  uint64_t result = 0;
+                  if (!status) status = ra_ps3_api.run_llvm_self_test(5, &result);
+                  if (status) failure = RALabPS3Error(status);
+                  else if (result != 22) failure = @"PS3 executable-memory self-test returned an invalid result.";
+                  else ready = YES;
                }
             }
          }
@@ -308,7 +331,7 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
 - (void)resizeSurface
 {
    CAMetalLayer *layer = (CAMetalLayer *)self.surface.layer;
-   CGFloat scale = self.view.window.screen.scale ?: UIScreen.mainScreen.scale;
+   CGFloat scale = self.traitCollection.displayScale;
    CGSize size = self.surface.bounds.size;
    if (size.width <= 0 || size.height <= 0) return;
    layer.contentsScale = scale;
@@ -361,8 +384,8 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
          pad.right_stick_x = gamepad.rightThumbstick.xAxis.value; pad.right_stick_y = gamepad.rightThumbstick.yAxis.value;
          pad.left_trigger = gamepad.leftTrigger.value; pad.right_trigger = gamepad.rightTrigger.value;
       }
-      if (pad.buttons & RPCS3_IOS_PAD_BUTTON_L2) pad.left_trigger = fmaxf(pad.left_trigger, 1);
-      if (pad.buttons & RPCS3_IOS_PAD_BUTTON_R2) pad.right_trigger = fmaxf(pad.right_trigger, 1);
+      if (index == 0 && (self.touchButtons & RPCS3_IOS_PAD_BUTTON_L2)) pad.left_trigger = fmaxf(pad.left_trigger, 1);
+      if (index == 0 && (self.touchButtons & RPCS3_IOS_PAD_BUTTON_R2)) pad.right_trigger = fmaxf(pad.right_trigger, 1);
       ra_ps3_api.set_pad_state(index, &pad);
    }
    if (self.busy)

@@ -5,7 +5,7 @@
 #include <string.h>
 
 #define RA_PS3_FUNCTIONS(X) \
-   X(abi_version) X(build_info) X(initialize) X(last_error) \
+   X(abi_version) X(build_info) X(initialize) X(last_error) X(run_llvm_self_test) \
    X(firmware_version) X(install_firmware) X(install_package) \
    X(install_rap) X(install_iso) X(install_folder) X(enumerate_games) \
    X(set_display_surface) X(set_pad_state) X(boot_game) \

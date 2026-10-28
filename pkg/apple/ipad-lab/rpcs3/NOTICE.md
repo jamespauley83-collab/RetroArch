@@ -1,8 +1,10 @@
 # XITRIX RPCS3 native bridge
 
 RPCS3IOS.h is the unmodified ABI 30 header from XITRIX/rpcs3 at
-f88bff947b83730c0cf8a3949f59338b992b3ca0. RPCS3 and this bridge are GPLv2-or-later
-and GPLv3-or-later respectively. See the upstream RPCS3 COPYING and RetroArch COPYING.
+f88bff947b83730c0cf8a3949f59338b992b3ca0. RPCS3 is predominantly GPL-2.0-only; this bridge is GPL-3.0-or-later.
+See RPCS3-LICENSE and RetroArch COPYING. This is a private local prototype.
+The combined binary is not published; license compatibility must be resolved
+before redistributing a combined application.
 
 The local test package reuses the user's verified XITRIX Preview 0.12 ARMv8.4-A
 core, SHA-256 64c942bc435d82627f7ad223ed091be76e1e2ba112c7f95d3596e68c31188237.
