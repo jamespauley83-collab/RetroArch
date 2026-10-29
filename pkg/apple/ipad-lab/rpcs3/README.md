@@ -115,6 +115,14 @@ that test explicitly with `-only-testing:LabUITests/LabUITests/testDeviceJITHand
 it relaunches only the candidate and leaves its PS3 screen ready. It skips on
 the simulator and does not establish gameplay acceptance.
 
+After importing firmware and a game and initializing PS3, run
+`-only-testing:LabUITests/LabUITests/testDeviceReadyGameLifecycle` for real-core
+startup, pause/resume, background pause, rotation, stop and reboot checks. It
+allows up to 20 minutes for first-time compilation, captures display evidence,
+and leaves the rebooted title paused. It skips when the device fixture is not
+ready. Sound, physical controller input and in-game save/reload still require
+acceptance on the iPad.
+
 ## Physical acceptance still required
 
 1. Provision and install only the candidate. Verify all working app identities
