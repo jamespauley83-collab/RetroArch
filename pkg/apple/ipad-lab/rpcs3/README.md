@@ -10,7 +10,8 @@ gameplay; that does not establish gameplay in this new host.
 - Candidate identity: `com.jamespauley.retroarchlab.ps3bridge`, display name
   **RetroArch PS3 Bridge**, URL scheme `retroarchlabps3bridge`.
 - PS3 data is private to this candidate at `Documents/PS3/Data`; its disposable
-  cache is `Documents/PS3/Cache`. No working-app container is opened or migrated.
+  cache is `Documents/PS3/Cache`. Working-app data is never changed or
+  automatically migrated. Imports copy only the selected source content.
 - Import firmware PUP, decrypted ISO, PKG, RAP, or an extracted game folder.
   Security-scoped sources stay readable for the whole coordinated import and
   are never deleted. This prototype does not import encrypted ISOs with a
@@ -29,6 +30,9 @@ gameplay; that does not establish gameplay in this new host.
 - Boot/import/stop/pause work is serialized off the UI thread. The main-thread
   callback is dispatched asynchronously; Metal resize, input and boot-progress
   callbacks use upstream's independently synchronized interfaces.
+- An accepted boot request can still be compiling shaders. The bridge polls
+  the actual emulation state off the UI thread and enables Pause only after
+  startup finishes. Stop remains available during compilation.
 - Backgrounding releases inputs and queues pause, including during boot.
   Returning to the foreground does not resume play automatically. A failed
   stop retains the surface and permits retry. The surface is detached only
@@ -89,10 +93,12 @@ xcodebuild -project RPCS3BridgeTests.xcodeproj -scheme BridgeTests \
   -destination 'platform=iOS Simulator,id=SIMULATOR_UDID' test
 ```
 
-The six native lifecycle tests inject a fake ABI into the actual bridge
+The ten native lifecycle tests inject a fake ABI into the actual bridge
 controller. They cover callback data ownership, duplicate boot rejection,
 stop during boot, stop failure/retry, pause across background/foreground, and
-missing JIT. They do not execute the device RPCS3 binary. The API harness rejects
+missing JIT, plus asynchronous startup, backgrounding during that startup,
+pause failure and stopped-startup reporting. They do not execute the device
+RPCS3 binary. The API harness rejects
 ABI 29/31 and each missing required symbol without exposing a partial API.
 The six packager tests cover identity, input preservation, tampering and output
 collision.

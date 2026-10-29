@@ -5,7 +5,7 @@
 
 bool exec_mem_begin_builtin_jit(void) { return true; }
 void exec_mem_end_builtin_jit(void) {}
-static atomic_int state, attached, boots, stops, pauses, resumes, disconnected, stopFails;
+static atomic_int state, attached, boots, stops, pauses, resumes, disconnected, stopFails, bootState, pauseFails;
 static dispatch_semaphore_t bootGate;
 static const char *mockError(void) { return "test failure"; }
 static const char *mockFirmware(void) { return "4.93"; }
@@ -25,7 +25,7 @@ static rpcs3_ios_status mockBoot(const char *title, const char *save)
    if (!atomic_load(&attached)) return RPCS3_IOS_BOOT_FAILED;
    atomic_fetch_add(&boots, 1);
    dispatch_semaphore_wait(bootGate, DISPATCH_TIME_FOREVER);
-   atomic_store(&state, RPCS3_IOS_EMULATION_STATE_RUNNING); return 0;
+   atomic_store(&state, atomic_load(&bootState)); return 0;
 }
 static rpcs3_ios_status mockStop(void)
 {
@@ -35,7 +35,10 @@ static rpcs3_ios_status mockStop(void)
 }
 static rpcs3_ios_emulation_state mockState(void) { return atomic_load(&state); }
 static rpcs3_ios_status mockPause(void)
-{ atomic_fetch_add(&pauses, 1); atomic_store(&state, RPCS3_IOS_EMULATION_STATE_PAUSED); return 0; }
+{
+   if (atomic_load(&pauseFails)) return RPCS3_IOS_INVALID_STATE;
+   atomic_fetch_add(&pauses, 1); atomic_store(&state, RPCS3_IOS_EMULATION_STATE_PAUSED); return 0;
+}
 static rpcs3_ios_status mockResume(void)
 { atomic_fetch_add(&resumes, 1); atomic_store(&state, RPCS3_IOS_EMULATION_STATE_RUNNING); return 0; }
 static rpcs3_ios_status mockPad(uint32_t index, const rpcs3_ios_pad_state *pad)
@@ -61,6 +64,7 @@ static rpcs3_ios_status mockProgress(uint32_t *done, uint32_t *total, char *stag
    atomic_store(&state, RPCS3_IOS_EMULATION_STATE_STOPPED);
    atomic_store(&attached, 0); atomic_store(&boots, 0); atomic_store(&stops, 0);
    atomic_store(&pauses, 0); atomic_store(&resumes, 0); atomic_store(&disconnected, 0); atomic_store(&stopFails, 0);
+   atomic_store(&bootState, RPCS3_IOS_EMULATION_STATE_RUNNING); atomic_store(&pauseFails, 0);
    bootGate = dispatch_semaphore_create(0);
    ra_ps3_queue = dispatch_queue_create("ps3.tests", DISPATCH_QUEUE_SERIAL);
    ra_ps3_ready = YES; ra_ps3_failed = NO; ra_ps3_handle = NULL;
@@ -143,5 +147,42 @@ static rpcs3_ios_status mockProgress(uint32_t *done, uint32_t *total, char *stag
    XCTAssertEqual(atomic_load(&boots), 1);
    dispatch_semaphore_signal(bootGate);
    [self until:^BOOL{ return !self.controller.busy; }];
+}
+- (void)testAcceptedBootWaitsForRunningBeforeEnablingPause
+{
+   atomic_store(&bootState, RPCS3_IOS_EMULATION_STATE_READY);
+   [self boot]; dispatch_semaphore_signal(bootGate);
+   [self until:^BOOL{ return atomic_load(&state) == RPCS3_IOS_EMULATION_STATE_READY; }];
+   XCTAssertTrue(self.controller.busy); XCTAssertFalse(self.controller.pauseButton.enabled);
+   atomic_store(&state, RPCS3_IOS_EMULATION_STATE_RUNNING);
+   [self until:^BOOL{ return !self.controller.busy; }];
+   XCTAssertFalse(self.controller.booting); XCTAssertTrue(self.controller.pauseButton.enabled);
+}
+- (void)testBackgroundDuringAsyncStartupPausesOnceRunning
+{
+   atomic_store(&bootState, RPCS3_IOS_EMULATION_STATE_STARTING);
+   [self boot]; dispatch_semaphore_signal(bootGate);
+   [self until:^BOOL{ return atomic_load(&state) == RPCS3_IOS_EMULATION_STATE_STARTING; }];
+   [self.controller background]; XCTAssertEqual(atomic_load(&pauses), 0);
+   atomic_store(&state, RPCS3_IOS_EMULATION_STATE_RUNNING);
+   [self until:^BOOL{ return atomic_load(&state) == RPCS3_IOS_EMULATION_STATE_PAUSED; }];
+   [self.controller foreground]; XCTAssertEqual(atomic_load(&resumes), 0);
+}
+- (void)testFailedPauseDoesNotOfferResume
+{
+   [self boot]; dispatch_semaphore_signal(bootGate);
+   [self until:^BOOL{ return !self.controller.busy; }];
+   atomic_store(&pauseFails, 1); [self.controller togglePause];
+   [self until:^BOOL{ return !self.controller.pausePending; }];
+   XCTAssertEqualObjects(self.controller.pauseButton.currentTitle, @"Pause");
+   XCTAssertTrue([self.controller.status.text containsString:@"test failure"]);
+}
+- (void)testStoppedStartupKeepsItsFailureMessage
+{
+   atomic_store(&bootState, RPCS3_IOS_EMULATION_STATE_STOPPED);
+   [self boot]; dispatch_semaphore_signal(bootGate);
+   [self until:^BOOL{ return !self.controller.playing && !self.controller.busy; }];
+   XCTAssertFalse(atomic_load(&attached));
+   XCTAssertEqualObjects(self.controller.status.text, @"Game stopped before startup completed.");
 }
 @end

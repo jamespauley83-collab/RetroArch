@@ -72,6 +72,9 @@ static void RALabPS3Log(void *context, int32_t level, const char *message)
 @property(nonatomic, copy) NSArray *games;
 @property(nonatomic, copy) NSString *importKind;
 @property(nonatomic, assign) BOOL busy;
+@property(nonatomic, assign) BOOL booting;
+@property(nonatomic, assign) NSUInteger bootGeneration;
+@property(nonatomic, copy) NSString *bootError;
 @property(nonatomic, assign) BOOL playing;
 @property(nonatomic, assign) BOOL stopping;
 @property(nonatomic, assign) BOOL backgrounded;
@@ -168,7 +171,6 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
          [layout.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-8],
          [layout.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:12],
          [layout.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-12],
-         [self.surface.heightAnchor constraintLessThanOrEqualToAnchor:self.surface.widthAnchor multiplier:9.0/16.0],
          [self.controls.heightAnchor constraintEqualToConstant:88]]];
    NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
    [center addObserver:self selector:@selector(background) name:UIApplicationWillResignActiveNotification object:nil];
@@ -287,7 +289,7 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
             @"Firmware %@ · %lu games · Connect a controller for analog sticks.",
             RALabPS3String(ra_ps3_api.firmware_version()), (unsigned long)games.count];
       dispatch_async(dispatch_get_main_queue(), ^{
-         self.games = games; self.status.text = message; self.busy = NO;
+         self.games = games; self.status.text = self.bootError ?: message; self.bootError = nil; self.busy = NO;
          [self.table reloadData]; [self updateControls];
       });
    });
@@ -307,7 +309,8 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
    [table deselectRowAtIndexPath:path animated:YES];
    if (self.busy || self.playing || !ra_ps3_ready || self.backgrounded) return;
    NSString *titleID = self.games[path.row][@"id"];
-   self.playing = YES; self.busy = YES;
+   self.playing = YES; self.busy = YES; self.booting = YES;
+   NSUInteger generation = ++self.bootGeneration;
    self.status.text = @"Preparing game…";
    [self updateControls]; [self.view layoutIfNeeded];
    [self resizeSurface];
@@ -315,11 +318,39 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
    [self.displayLink addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
    dispatch_async(ra_ps3_queue, ^{
       int status = ra_ps3_api.boot_game(titleID.UTF8String, NULL);
-      NSString *message = status ? RALabPS3Error(status) : @"Game running. Save in the game before stopping.";
+      NSString *message = status ? RALabPS3Error(status) : @"Starting game. First-time shader compilation may take a few minutes…";
       dispatch_async(dispatch_get_main_queue(), ^{
-         self.busy = NO; self.status.text = message; [self updateControls];
-         if (status) [self stopGame];
-         else if (self.backgrounded) [self pauseForBackground];
+         if (generation != self.bootGeneration || self.stopping) return;
+         self.status.text = message;
+         if (status) { self.bootError = message; [self stopGame]; }
+         else [self pollBoot:generation];
+      });
+   });
+}
+- (void)pollBoot:(NSUInteger)generation
+{
+   if (generation != self.bootGeneration || !self.playing || !self.booting || self.stopping) return;
+   dispatch_async(ra_ps3_queue, ^{
+      rpcs3_ios_emulation_state state = ra_ps3_api.get_emulation_state();
+      dispatch_async(dispatch_get_main_queue(), ^{
+         if (generation != self.bootGeneration || !self.playing || self.stopping) return;
+         if (state == RPCS3_IOS_EMULATION_STATE_RUNNING || state == RPCS3_IOS_EMULATION_STATE_PAUSED)
+         {
+            self.booting = NO; self.busy = NO;
+            BOOL paused = state == RPCS3_IOS_EMULATION_STATE_PAUSED;
+            self.status.text = paused ? @"Paused." : @"Game running. Save in the game before stopping.";
+            [self.pauseButton setTitle:paused ? @"Resume" : @"Pause" forState:UIControlStateNormal];
+            [self updateControls];
+            if (self.backgrounded && !paused) [self pauseForBackground];
+         }
+         else if (state == RPCS3_IOS_EMULATION_STATE_STOPPED)
+         {
+            self.bootError = @"Game stopped before startup completed.";
+            [self stopGame];
+         }
+         else dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC / 4), dispatch_get_main_queue(), ^{
+            [self pollBoot:generation];
+         });
       });
    });
 }
@@ -406,7 +437,7 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
       dispatch_async(dispatch_get_main_queue(), ^{
          self.pausePending = NO;
          self.status.text = error ?: (resume ? @"Game running." : @"Paused.");
-         [self.pauseButton setTitle:resume ? @"Pause" : @"Resume" forState:UIControlStateNormal];
+         if (!status) [self.pauseButton setTitle:resume ? @"Pause" : @"Resume" forState:UIControlStateNormal];
          [self updateControls];
          if (self.backgrounded && resume) [self pauseForBackground];
       });
@@ -416,12 +447,15 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
 {
    if (!self.playing || self.stopping) return;
    [self releaseInput];
+   if (self.booting) return;
    dispatch_async(ra_ps3_queue, ^{
-      if (ra_ps3_api.get_emulation_state() == RPCS3_IOS_EMULATION_STATE_RUNNING)
-         ra_ps3_api.pause_emulation();
+      rpcs3_ios_emulation_state state = ra_ps3_api.get_emulation_state();
+      int status = state == RPCS3_IOS_EMULATION_STATE_RUNNING ? ra_ps3_api.pause_emulation() : 0;
+      BOOL paused = !status && (state == RPCS3_IOS_EMULATION_STATE_RUNNING || state == RPCS3_IOS_EMULATION_STATE_PAUSED);
+      NSString *error = status ? RALabPS3Error(status) : nil;
       dispatch_async(dispatch_get_main_queue(), ^{
-         [self.pauseButton setTitle:@"Resume" forState:UIControlStateNormal];
-         if (!self.stopping) self.status.text = @"Paused. Tap Resume when ready.";
+         if (paused) [self.pauseButton setTitle:@"Resume" forState:UIControlStateNormal];
+         if (!self.stopping && (paused || error)) self.status.text = error ?: @"Paused. Tap Resume when ready.";
       });
    });
 }
@@ -435,6 +469,7 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
 - (void)stopGame
 {
    if (!self.playing || self.stopping) return;
+   ++self.bootGeneration;
    self.stopping = YES; self.busy = YES;
    self.status.text = @"Stopping PS3. Keep this app open…";
    [self releaseInput]; [self.displayLink invalidate]; self.displayLink = nil;
@@ -445,8 +480,13 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
       NSString *error = status ? RALabPS3Error(status) : nil;
       dispatch_async(dispatch_get_main_queue(), ^{
          self.busy = NO; self.stopping = NO;
-         if (status) { self.status.text = error; [self updateControls]; return; }
-         self.playing = NO; [self.pauseButton setTitle:@"Pause" forState:UIControlStateNormal];
+         if (status)
+         {
+            self.busy = self.booting; self.status.text = error; [self updateControls];
+            if (self.booting) [self pollBoot:self.bootGeneration];
+            return;
+         }
+         self.playing = NO; self.booting = NO; [self.pauseButton setTitle:@"Pause" forState:UIControlStateNormal];
          [self updateControls]; [self reloadGames];
       });
    });
