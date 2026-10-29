@@ -115,7 +115,7 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
    self.status.numberOfLines = 0;
    self.status.font = [UIFont preferredFontForTextStyle:UIFontTextStyleSubheadline];
    self.status.accessibilityIdentifier = @"PS3 status";
-   self.status.text = @"XITRIX 0.12 bridge. Enable Universal JIT for this test app in StikDebug, return here, then Start PS3. Import firmware and games into this app's separate library.";
+   self.status.text = @"XITRIX 0.12 bridge. Enable PS3 JIT to relaunch this test app through StikDebug. Then open PS3 and tap Start PS3. Import firmware and games into this app's separate library.";
    self.jitButton = [self button:@"Enable PS3 JIT" action:@selector(enableJIT)];
    self.startButton = [self button:@"Start PS3" action:@selector(startCore)];
    self.importButton = [self button:@"Import" action:@selector(importMenu)];
@@ -201,11 +201,11 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
 {
    NSURLComponents *url = [[NSURLComponents alloc] init];
    url.scheme = @"stikdebug"; url.host = @"enable-jit";
+   /* StikDebug must launch the process before attaching on this device. */
    url.queryItems = @[[NSURLQueryItem queryItemWithName:@"bundle-id" value:NSBundle.mainBundle.bundleIdentifier],
-         [NSURLQueryItem queryItemWithName:@"pid" value:[NSString stringWithFormat:@"%d", getpid()]],
          [NSURLQueryItem queryItemWithName:@"script-name" value:@"universal.js"]];
    [UIApplication.sharedApplication openURL:url.URL options:@{} completionHandler:^(BOOL opened) {
-      self.status.text = opened ? @"Return here after StikDebug attaches Universal, then tap Start PS3."
+      self.status.text = opened ? @"Let StikDebug relaunch this test app with Universal, then open PS3 and tap Start PS3."
             : @"Open StikDebug, assign universal.js to this PS3 test app, and launch it there.";
    }];
 }

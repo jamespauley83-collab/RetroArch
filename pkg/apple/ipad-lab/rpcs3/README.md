@@ -15,9 +15,12 @@ gameplay; that does not establish gameplay in this new host.
   Security-scoped sources stay readable for the whole coordinated import and
   are never deleted. This prototype does not import encrypted ISOs with a
   separate key, ZIPs, saves or savestates through its UI.
-- **Enable PS3 JIT** opens StikDebug for this running bundle and `universal.js`.
-  Return to the bridge and tap **Start PS3**. It checks the development profile,
-  takes Lab's activation lease, probes Universal without detaching, then loads
+- **Enable PS3 JIT** asks StikDebug to relaunch this bundle with `universal.js`.
+  Approve **Enable and Run Script**, then open **PS3** and tap **Start PS3**.
+  Attaching to an already-running process returned `E96` on the target iPad;
+  launching through StikDebug passed core initialization and the LLVM self-test.
+  The JIT button is available only before the core is ready. **Start PS3** checks
+  the development profile, takes Lab's activation lease, probes Universal without detaching, then loads
   the core. RPCS3 prepares its own arena and runs its LLVM execution self-test.
   Lab's built-in helper is not used for PS3 in this candidate.
 - The core stays loaded for the lifetime of the process. Initialization failure
@@ -98,6 +101,13 @@ For the full UI test, build the Lab host for the simulator with the same flags,
 install it under the candidate identifier using `simctl`, then run the
 `LabUITests` scheme. It verifies native-library startup, PS3 navigation and
 recoverable missing-JIT behavior in the full RetroArch application.
+
+On the paired iPad, `LabUITests/testDeviceJITHandoffInitializesCore` also checks
+the real StikDebug handoff and native core initialization. It requires a signed
+candidate, StikDebug Universal, and the user's working VPN/pairing setup. Run
+that test explicitly with `-only-testing:LabUITests/LabUITests/testDeviceJITHandoffInitializesCore`;
+it relaunches only the candidate and leaves its PS3 screen ready. It skips on
+the simulator and does not establish gameplay acceptance.
 
 ## Physical acceptance still required
 
