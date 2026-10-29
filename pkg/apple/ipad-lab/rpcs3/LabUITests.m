@@ -74,9 +74,13 @@
    self.continueAfterFailure = NO;
    XCUIApplication *app = [[XCUIApplication alloc] initWithBundleIdentifier:@"com.jamespauley.retroarchlab.ps3bridge"];
    [app activate];
-   XCTSkipUnless(app.staticTexts[@"PS3 status"].exists && app.buttons[@"Import"].enabled &&
-         app.tables[@"PS3 games"].cells.count > 0, @"Initialize PS3 and import firmware and a game first.");
-   [app.tables[@"PS3 games"].cells.firstMatch tap];
+   BOOL activeGame = app.buttons[@"Stop game"].exists;
+   XCTSkipUnless(app.staticTexts[@"PS3 status"].exists && (activeGame ||
+         (app.buttons[@"Import"].enabled && app.tables[@"PS3 games"].cells.count > 0)),
+         @"Initialize PS3 and import firmware and a game first.");
+   if (!activeGame) [app.tables[@"PS3 games"].cells.firstMatch tap];
+   else if (app.buttons[@"Resume"].exists)
+   { [app.buttons[@"Resume"] tap]; [self waitForStatus:app prefix:@"Game running"]; }
    if (!app.buttons[@"Pause"].enabled)
       XCTAssertFalse([app.staticTexts[@"PS3 status"].label hasPrefix:@"Game running"]);
    [self waitForEnabled:app.buttons[@"Pause"] timeout:1200];

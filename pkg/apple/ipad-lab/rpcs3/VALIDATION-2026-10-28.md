@@ -34,9 +34,10 @@ XITRIX core SHA-256 (before development signing):
 
 ## Deployment status
 
-**Signed and installed on the M3 iPad Air; native core initialization, LLVM
-self-test and firmware 4.93 installation passed. Bridge gameplay is not yet
-verified.**
+**Build 3 is signed and installed on the M3 iPad Air. JIT, firmware/game import,
+game startup, presentation, touch Start and the real-core lifecycle test passed.
+Full gameplay, sound, physical controllers and in-game save/reload acceptance
+remain pending.**
 
 After the user completed Xcode sign-in, automatic provisioning issued a profile
 for `com.jamespauley.retroarchlab.ps3bridge`, expiring October 28, 2027. Its
@@ -69,6 +70,22 @@ The committed StikDebug/core initialization test passed on installed build 3
 (`ipad-jit-build3.log`), and all four original app records still matched the
 pre-install inventory (`ipad-apps-build3.json`).
 
+The real-core `testDeviceReadyGameLifecycle` passed on build 3 (155.571 seconds):
+startup reached RUNNING, explicit pause/resume worked, leaving the app paused
+the core without automatically resuming, rotation completed, stop restored the
+game library, and a second boot reached RUNNING and paused successfully. The
+test captured portrait and landscape frames. The landscape frame showed the
+game's own required-data installation screen. These checks validate lifecycle
+and presentation, not sound, physical controllers or in-game save reload.
+The earlier eight-minute diagnostic budget expired while PPU compilation was
+still progressing (157/191 remaining modules); the final test continued that
+startup with a longer budget. It did not report an emulator startup error.
+After the final reboot, the game completed its required-data installation and
+displayed its Press START screen. Pressing the bridge's touch Start control
+opened the game's main menu, confirming game presentation and digital input.
+The captured evidence is in `game-content-screenshot` and
+`touch-start-screenshot`; this is not a claim of level gameplay or save reload.
+
 The initial physical navigation test runner exited unexpectedly; subsequent
 device inspection confirmed navigation and recoverable missing-JIT behavior.
 Diagnostic test cases that only captured UI state are not counted as successful
@@ -87,8 +104,8 @@ the system picker into the candidate's own `Data/games/DiscImages/BLUS30256`.
 The standalone games-directory entries and metadata matched before/after
 (`standalone-games-before.json` and `standalone-games-after.json`). The source
 was opened for reading; no source save or configuration was imported or changed.
-Graphics/audio/input/save/reload acceptance remains pending. The standalone
-gameplay result remains the baseline.
+Full graphics/audio/controller/save/reload acceptance remains pending. The
+standalone gameplay result remains the baseline.
 
 The import sheet presented Apple's document picker, but its Recents view stayed
 blank and accessibility queries timed out. The device recorded a scene-update
@@ -116,6 +133,11 @@ Initial logs: `build-final.log`, `simulator-build2.log`, `tests-final.log`,
 Build 3 logs: `build-async-boot.log`, `tests-async-boot.log`,
 `native-checks-async-boot.log`, `ipad-install-28fac06.json`, and
 `ipad-stop-compilation.log` (the pre-update stop test).
+The passing final game lifecycle result is
+`PhysicalTestDerivedData/Logs/Test/Test-LabUITests-2026.10.28_20-44-28--0400.xcresult`,
+with `ipad-final-game-lifecycle.log` and `final-lifecycle-screenshots` beside it
+under the work directory. The ready-game test can continue an in-progress
+startup so first compilation need not be discarded after a short diagnostic.
 The source worktree is `source`; `signing-template` is scoped to the candidate.
 The accepted standalone download/signing directory and all previous Lab source
 directories were preserved. No combined binary was published.

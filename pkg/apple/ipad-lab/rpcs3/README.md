@@ -120,7 +120,8 @@ After importing firmware and a game and initializing PS3, run
 startup, pause/resume, background pause, rotation, stop and reboot checks. It
 allows up to 20 minutes for first-time compilation, captures display evidence,
 and leaves the rebooted title paused. It skips when the device fixture is not
-ready. Sound, physical controller input and in-game save/reload still require
+ready, and can continue an already-starting or running title. Sound, physical
+controller input and in-game save/reload still require
 acceptance on the iPad.
 
 ## Physical acceptance still required
