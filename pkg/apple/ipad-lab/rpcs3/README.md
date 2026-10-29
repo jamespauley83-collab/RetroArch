@@ -93,11 +93,12 @@ xcodebuild -project RPCS3BridgeTests.xcodeproj -scheme BridgeTests \
   -destination 'platform=iOS Simulator,id=SIMULATOR_UDID' test
 ```
 
-The ten native lifecycle tests inject a fake ABI into the actual bridge
+The thirteen native lifecycle tests inject a fake ABI into the actual bridge
 controller. They cover callback data ownership, duplicate boot rejection,
 stop during boot, stop failure/retry, pause across background/foreground, and
 missing JIT, plus asynchronous startup, backgrounding during that startup,
-pause failure and stopped-startup reporting. They do not execute the device
+pause failure, stopped-startup reporting, audio activation notifications,
+audio activation failure and interruption during boot. They do not execute the device
 RPCS3 binary. The API harness rejects
 ABI 29/31 and each missing required symbol without exposing a partial API.
 The six packager tests cover identity, input preservation, tampering and output
