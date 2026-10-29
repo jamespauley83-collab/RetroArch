@@ -46,6 +46,13 @@ static rpcs3_ios_status mockPad(uint32_t index, const rpcs3_ios_pad_state *pad)
 static rpcs3_ios_status mockProgress(uint32_t *done, uint32_t *total, char *stage, size_t length)
 { stage[0] = 0; return 0; }
 
+@interface AudioTestController : RALabPS3Controller
+@property(nonatomic, strong) NSError *audioError;
+@end
+@implementation AudioTestController
+- (NSError *)configureAudioSession { return self.audioError; }
+@end
+
 @interface BridgeTests : XCTestCase
 @property(nonatomic, strong) UIWindow *window;
 @property(nonatomic, strong) RALabPS3Controller *controller;
@@ -75,7 +82,7 @@ static rpcs3_ios_status mockProgress(uint32_t *done, uint32_t *total, char *stag
    ra_ps3_api.get_emulation_state = mockState; ra_ps3_api.pause_emulation = mockPause;
    ra_ps3_api.resume_emulation = mockResume; ra_ps3_api.set_pad_state = mockPad;
    ra_ps3_api.get_boot_progress = mockProgress;
-   self.controller = [[RALabPS3Controller alloc] init];
+   self.controller = [[AudioTestController alloc] init];
    UIWindowScene *scene = (UIWindowScene *)UIApplication.sharedApplication.connectedScenes.anyObject;
    self.window = [[UIWindow alloc] initWithWindowScene:scene];
    self.window.rootViewController = [[UINavigationController alloc] initWithRootViewController:self.controller];
@@ -184,5 +191,55 @@ static rpcs3_ios_status mockProgress(uint32_t *done, uint32_t *total, char *stag
    [self until:^BOOL{ return !self.controller.playing && !self.controller.busy; }];
    XCTAssertFalse(atomic_load(&attached));
    XCTAssertEqualObjects(self.controller.status.text, @"Game stopped before startup completed.");
+}
+- (void)testAudioActivationNotificationPrecedesBootAndResume
+{
+   __block NSUInteger activations = 0, suspensions = 0;
+   id active = [NSNotificationCenter.defaultCenter addObserverForName:@"RPCS3AudioSessionDidActivate"
+         object:nil queue:nil usingBlock:^(NSNotification *note) { activations++; }];
+   id suspended = [NSNotificationCenter.defaultCenter addObserverForName:@"RPCS3AudioSessionWillDeactivate"
+         object:nil queue:nil usingBlock:^(NSNotification *note) { suspensions++; }];
+   [self boot]; XCTAssertEqual(activations, 1u);
+   dispatch_semaphore_signal(bootGate);
+   [self until:^BOOL{ return !self.controller.busy; }];
+   [self.controller background]; XCTAssertEqual(suspensions, 1u);
+   [self until:^BOOL{ return atomic_load(&state) == RPCS3_IOS_EMULATION_STATE_PAUSED; }];
+   [self.controller foreground]; XCTAssertEqual(activations, 1u);
+   [self.controller togglePause];
+   [self until:^BOOL{ return atomic_load(&resumes) == 1; }];
+   XCTAssertEqual(activations, 2u);
+   [NSNotificationCenter.defaultCenter removeObserver:active];
+   [NSNotificationCenter.defaultCenter removeObserver:suspended];
+}
+- (void)testFailedAudioActivationBlocksBootAndResume
+{
+   AudioTestController *controller = (AudioTestController *)self.controller;
+   NSError *error = [NSError errorWithDomain:@"test" code:1 userInfo:nil];
+   controller.audioError = error;
+   [controller tableView:controller.table didSelectRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]];
+   XCTAssertEqual(atomic_load(&boots), 0);
+   XCTAssertFalse(controller.playing);
+   controller.audioError = nil; [self boot]; dispatch_semaphore_signal(bootGate);
+   [self until:^BOOL{ return !controller.busy; }];
+   [controller togglePause]; [self until:^BOOL{ return !controller.pausePending; }];
+   controller.audioError = error; [controller togglePause];
+   XCTAssertEqual(atomic_load(&resumes), 0);
+   XCTAssertEqualObjects(controller.pauseButton.currentTitle, @"Resume");
+   XCTAssertTrue([controller.status.text containsString:@"Unable to start PS3 audio"]);
+}
+- (void)testInterruptionDuringBootPausesAndRequiresExplicitResume
+{
+   atomic_store(&bootState, RPCS3_IOS_EMULATION_STATE_STARTING);
+   [self boot]; dispatch_semaphore_signal(bootGate);
+   [self until:^BOOL{ return atomic_load(&state) == RPCS3_IOS_EMULATION_STATE_STARTING; }];
+   [self.controller audioInterrupted:[NSNotification notificationWithName:AVAudioSessionInterruptionNotification
+         object:nil userInfo:@{AVAudioSessionInterruptionTypeKey: @(AVAudioSessionInterruptionTypeBegan)}]];
+   atomic_store(&state, RPCS3_IOS_EMULATION_STATE_RUNNING);
+   [self until:^BOOL{ return atomic_load(&state) == RPCS3_IOS_EMULATION_STATE_PAUSED; }];
+   [self.controller togglePause]; XCTAssertEqual(atomic_load(&resumes), 0);
+   [self.controller audioInterrupted:[NSNotification notificationWithName:AVAudioSessionInterruptionNotification
+         object:nil userInfo:@{AVAudioSessionInterruptionTypeKey: @(AVAudioSessionInterruptionTypeEnded)}]];
+   XCTAssertEqual(atomic_load(&resumes), 0);
+   [self.controller togglePause]; [self until:^BOOL{ return atomic_load(&resumes) == 1; }];
 }
 @end

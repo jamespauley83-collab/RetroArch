@@ -79,6 +79,7 @@ static void RALabPS3Log(void *context, int32_t level, const char *message)
 @property(nonatomic, assign) BOOL stopping;
 @property(nonatomic, assign) BOOL backgrounded;
 @property(nonatomic, assign) BOOL pausePending;
+@property(nonatomic, assign) BOOL audioInterruption;
 @property(nonatomic, assign) uint64_t touchButtons;
 @property(nonatomic, strong) NSArray<GCController *> *controllers;
 @end
@@ -308,6 +309,7 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
 {
    [table deselectRowAtIndexPath:path animated:YES];
    if (self.busy || self.playing || !ra_ps3_ready || self.backgrounded) return;
+   if (self.audioInterruption || ![self activateAudio]) return;
    NSString *titleID = self.games[path.row][@"id"];
    self.playing = YES; self.busy = YES; self.booting = YES;
    NSUInteger generation = ++self.bootGeneration;
@@ -341,7 +343,7 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
             self.status.text = paused ? @"Paused." : @"Game running. Save in the game before stopping.";
             [self.pauseButton setTitle:paused ? @"Resume" : @"Pause" forState:UIControlStateNormal];
             [self updateControls];
-            if (self.backgrounded && !paused) [self pauseForBackground];
+            if ((self.backgrounded || self.audioInterruption) && !paused) [self pauseForBackground];
          }
          else if (state == RPCS3_IOS_EMULATION_STATE_STOPPED)
          {
@@ -426,9 +428,42 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
          self.status.text = RALabPS3String(stage);
    }
 }
+/* XITRIX 0.12 keeps RemoteIO suspended until these wrapper notifications.
+ * Post only after initialize has installed its observer, and after AVAudioSession
+ * activation succeeds. UIKit/session work stays on the main thread. */
+- (NSError *)configureAudioSession
+{
+   AVAudioSession *session = AVAudioSession.sharedInstance;
+   NSError *error = nil;
+   if (![session setCategory:AVAudioSessionCategoryPlayback mode:AVAudioSessionModeDefault options:0 error:&error] ||
+         ![session setActive:YES error:&error])
+      return error ?: [NSError errorWithDomain:@"LabPS3Audio" code:1 userInfo:
+            @{NSLocalizedDescriptionKey: @"Audio session activation failed."}];
+   return nil;
+}
+- (BOOL)activateAudio
+{
+   NSError *error = [self configureAudioSession];
+   if (error)
+   {
+      self.status.text = [@"Unable to start PS3 audio: " stringByAppendingString:error.localizedDescription];
+      return NO;
+   }
+   [NSNotificationCenter.defaultCenter postNotificationName:@"RPCS3AudioSessionDidActivate" object:nil];
+   AVAudioSession *session = AVAudioSession.sharedInstance;
+   NSLog(@"[Lab PS3] Audio activated: category=%@ route=%@ volume=%.2f sampleRate=%.0f",
+         session.category, session.currentRoute.outputs, session.outputVolume, session.sampleRate);
+   return YES;
+}
+- (void)suspendAudio
+{
+   if (ra_ps3_ready)
+      [NSNotificationCenter.defaultCenter postNotificationName:@"RPCS3AudioSessionWillDeactivate" object:nil];
+}
 - (void)togglePause
 {
-   if (self.busy || self.pausePending || !self.playing || self.stopping) return;
+   if (self.busy || self.pausePending || !self.playing || self.stopping || self.backgrounded || self.audioInterruption) return;
+   if ([self.pauseButton.currentTitle isEqualToString:@"Resume"] && ![self activateAudio]) return;
    self.pausePending = YES; [self releaseInput]; [self updateControls];
    dispatch_async(ra_ps3_queue, ^{
       BOOL resume = ra_ps3_api.get_emulation_state() == RPCS3_IOS_EMULATION_STATE_PAUSED;
@@ -459,12 +494,14 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
       });
    });
 }
-- (void)background { self.backgrounded = YES; [self pauseForBackground]; }
+- (void)background { self.backgrounded = YES; [self suspendAudio]; [self pauseForBackground]; }
 - (void)foreground { self.backgrounded = NO; }
 - (void)audioInterrupted:(NSNotification *)notification
 {
-   if ([notification.userInfo[AVAudioSessionInterruptionTypeKey] unsignedIntegerValue] == AVAudioSessionInterruptionTypeBegan)
-      [self pauseForBackground];
+   self.audioInterruption = [notification.userInfo[AVAudioSessionInterruptionTypeKey] unsignedIntegerValue] == AVAudioSessionInterruptionTypeBegan;
+   if (self.audioInterruption)
+   { [self suspendAudio]; [self pauseForBackground]; }
+   /* Ended does not auto-resume. The user's Resume action activates the session. */
 }
 - (void)stopGame
 {

@@ -140,3 +140,21 @@ acceptance on the iPad.
 
 Do not mark physical gameplay accepted or merge this candidate on the strength
 of simulator tests alone.
+
+### Native audio session
+
+The ABI-30 header alone does not describe XITRIX 0.12's audio lifecycle contract.
+`rpcs3/ios/RPCS3IOSPlatform.mm` registers `RPCS3AudioSessionDidActivate` and
+`RPCS3AudioSessionWillDeactivate` notifications during core initialization.
+`IOSAudioBackend::Play()` deliberately leaves RemoteIO stopped until activation.
+The bridge configures/activates an AVAudioSession playback session before boot
+and explicit Resume, then posts DidActivate. Backgrounding and interruptions
+post WillDeactivate before pausing. An interruption during compilation also
+pauses once the game reaches RUNNING. Foreground/interruption end never resumes
+the game automatically; failed audio activation blocks boot/resume with an error.
+This uses the system's selected audio route and volume without changing either.
+
+Source contract: XITRIX/rpcs3 commit
+`f88bff947b83730c0cf8a3949f59338b992b3ca0`,
+`rpcs3/ios/RPCS3IOSPlatform.mm` and `rpcs3/Emu/Audio/IOS/IOSAudioBackend.cpp`.
+Both notification strings were also verified in the pinned 0.12 binary.
