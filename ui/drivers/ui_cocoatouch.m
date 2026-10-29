@@ -1803,7 +1803,9 @@ int main(int argc, char *argv[])
     if (jb_enable_ptrace_hack())
         RARCH_LOG("[Cocoa] Ptrace hack complete, JIT support is enabled.\n");
 #endif
+#ifndef HAVE_RETROARCH_LAB_RPCS3
     exec_mem_pool_init();
+#endif
 #ifdef HAVE_SDL2
     SDL_SetMainReady();
 #endif

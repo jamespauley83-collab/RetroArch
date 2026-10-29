@@ -896,6 +896,10 @@ void rarch_stop_draw_observer(void)
 
 - (void)viewDidAppear:(BOOL)animated
 {
+#if defined(HAVE_RETROARCH_LAB_RPCS3) && TARGET_OS_IOS
+    static dispatch_once_t libraryOnce;
+    dispatch_once(&libraryOnce, ^{ cocoa_lab_show_library(); });
+#endif
 #if TARGET_OS_IOS
     if (apple_runtime_available(0, APPLE_RUNTIME_VER(11, 0, 0), 0))
         [self setNeedsUpdateOfHomeIndicatorAutoHidden];

@@ -1,0 +1,63 @@
+name: RPCS3BridgeTests
+options:
+  deploymentTarget:
+    iOS: '26.0'
+settings:
+  base:
+    CLANG_ENABLE_OBJC_ARC: YES
+    CODE_SIGNING_ALLOWED: NO
+    GENERATE_INFOPLIST_FILE: YES
+    INFOPLIST_KEY_UILaunchScreen_Generation: YES
+    TARGETED_DEVICE_FAMILY: '1,2'
+targets:
+  BridgeTestHost:
+    type: application
+    platform: iOS
+    sources: [TestHost.m]
+    info:
+      path: TestHost-Info.plist
+      properties:
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+          UISceneConfigurations:
+            UIWindowSceneSessionRoleApplication:
+              - UISceneConfigurationName: Default
+                UISceneDelegateClassName: PS3TestScene
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jamespauley.retroarchlab.ps3bridgetests
+  BridgeTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [BridgeTests.m]
+    dependencies:
+      - target: BridgeTestHost
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jamespauley.retroarchlab.ps3bridgetests.tests
+        GCC_PREPROCESSOR_DEFINITIONS: ['$(inherited)', 'HAVE_RETROARCH_LAB_STIKJIT=1']
+  LabUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [LabUITests.m]
+    dependencies:
+      - target: BridgeTestHost
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jamespauley.retroarchlab.ps3bridgetests.ui
+        TEST_TARGET_NAME: BridgeTestHost
+schemes:
+  BridgeTests:
+    build:
+      targets:
+        BridgeTestHost: all
+        BridgeTests: [test]
+    test:
+      targets: [BridgeTests]
+  LabUITests:
+    build:
+      targets:
+        BridgeTestHost: all
+        LabUITests: [test]
+    test:
+      targets: [LabUITests]
