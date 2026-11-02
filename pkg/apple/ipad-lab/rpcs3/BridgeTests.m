@@ -6,7 +6,8 @@
 bool exec_mem_begin_builtin_jit(void) { return true; }
 void exec_mem_end_builtin_jit(void) {}
 static atomic_int state, attached, boots, stops, pauses, resumes, disconnected, stopFails, bootState, pauseFails;
-static dispatch_semaphore_t bootGate;
+static dispatch_semaphore_t bootGate, resumeGate, stopGate;
+static rpcs3_ios_pad_state pads[7];
 static const char *mockError(void) { return "test failure"; }
 static const char *mockFirmware(void) { return "4.93"; }
 static rpcs3_ios_status mockGames(rpcs3_ios_game_callback callback, void *context)
@@ -30,6 +31,7 @@ static rpcs3_ios_status mockBoot(const char *title, const char *save)
 static rpcs3_ios_status mockStop(void)
 {
    atomic_fetch_add(&stops, 1);
+   if (stopGate) dispatch_semaphore_wait(stopGate, DISPATCH_TIME_FOREVER);
    if (atomic_load(&stopFails)) return RPCS3_IOS_STOP_FAILED;
    atomic_store(&state, RPCS3_IOS_EMULATION_STATE_STOPPED); return 0;
 }
@@ -40,9 +42,17 @@ static rpcs3_ios_status mockPause(void)
    atomic_fetch_add(&pauses, 1); atomic_store(&state, RPCS3_IOS_EMULATION_STATE_PAUSED); return 0;
 }
 static rpcs3_ios_status mockResume(void)
-{ atomic_fetch_add(&resumes, 1); atomic_store(&state, RPCS3_IOS_EMULATION_STATE_RUNNING); return 0; }
+{
+   atomic_fetch_add(&resumes, 1);
+   if (resumeGate) dispatch_semaphore_wait(resumeGate, DISPATCH_TIME_FOREVER);
+   atomic_store(&state, RPCS3_IOS_EMULATION_STATE_RUNNING); return 0;
+}
 static rpcs3_ios_status mockPad(uint32_t index, const rpcs3_ios_pad_state *pad)
-{ if (!pad->connected) atomic_fetch_add(&disconnected, 1); return 0; }
+{
+   if (index < 7) pads[index] = *pad;
+   if (!pad->connected) atomic_fetch_add(&disconnected, 1);
+   return 0;
+}
 static rpcs3_ios_status mockProgress(uint32_t *done, uint32_t *total, char *stage, size_t length)
 { stage[0] = 0; return 0; }
 
@@ -72,7 +82,9 @@ static rpcs3_ios_status mockProgress(uint32_t *done, uint32_t *total, char *stag
    atomic_store(&attached, 0); atomic_store(&boots, 0); atomic_store(&stops, 0);
    atomic_store(&pauses, 0); atomic_store(&resumes, 0); atomic_store(&disconnected, 0); atomic_store(&stopFails, 0);
    atomic_store(&bootState, RPCS3_IOS_EMULATION_STATE_RUNNING); atomic_store(&pauseFails, 0);
+   memset(pads, 0, sizeof(pads));
    bootGate = dispatch_semaphore_create(0);
+   resumeGate = nil; stopGate = nil;
    ra_ps3_queue = dispatch_queue_create("ps3.tests", DISPATCH_QUEUE_SERIAL);
    ra_ps3_ready = YES; ra_ps3_failed = NO; ra_ps3_handle = NULL;
    ra_ps3_api = (RALabPS3API){0};
@@ -93,6 +105,8 @@ static rpcs3_ios_status mockProgress(uint32_t *done, uint32_t *total, char *stag
 - (void)tearDown
 {
    dispatch_semaphore_signal(bootGate);
+   if (resumeGate) dispatch_semaphore_signal(resumeGate);
+   if (stopGate) dispatch_semaphore_signal(stopGate);
    if (self.controller.playing)
    { atomic_store(&stopFails, 0); [self.controller stopGame]; [self until:^BOOL{ return !self.controller.playing; }]; }
    [self.controller.displayLink invalidate]; self.controller.displayLink = nil;
@@ -136,6 +150,8 @@ static rpcs3_ios_status mockProgress(uint32_t *done, uint32_t *total, char *stag
    atomic_store(&stopFails, 1); [self.controller stopGame];
    [self until:^BOOL{ return !self.controller.stopping; }];
    XCTAssertTrue(self.controller.playing); XCTAssertTrue(atomic_load(&attached));
+   self.controller.touchButtons = RPCS3_IOS_PAD_BUTTON_CROSS;
+   [self until:^BOOL{ return pads[0].buttons == RPCS3_IOS_PAD_BUTTON_CROSS; }];
    atomic_store(&stopFails, 0); [self.controller stopGame];
    [self until:^BOOL{ return !self.controller.playing; }];
    XCTAssertFalse(atomic_load(&attached));
@@ -146,6 +162,22 @@ static rpcs3_ios_status mockProgress(uint32_t *done, uint32_t *total, char *stag
    [self until:^BOOL{ return !self.controller.busy; }];
    XCTAssertFalse(ra_ps3_handle); XCTAssertFalse(ra_ps3_ready);
    XCTAssertTrue([self.controller.status.text containsString:@"Universal JIT is not attached"]);
+}
+- (void)testBriefBackgroundDuringFailedStopStillPauses
+{
+   [self boot]; dispatch_semaphore_signal(bootGate);
+   [self until:^BOOL{ return !self.controller.busy; }];
+   stopGate = dispatch_semaphore_create(0); atomic_store(&stopFails, 1);
+   [self.controller stopGame];
+   [self until:^BOOL{ return atomic_load(&stops) == 1; }];
+   [self.controller background]; [self.controller foreground];
+   dispatch_semaphore_signal(stopGate);
+   [self until:^BOOL{ return !self.controller.stopping && !self.controller.pausePending &&
+         [self.controller.pauseButton.currentTitle isEqualToString:@"Resume"]; }];
+   XCTAssertTrue(self.controller.playing); XCTAssertTrue(atomic_load(&attached));
+   XCTAssertEqual(atomic_load(&state), RPCS3_IOS_EMULATION_STATE_PAUSED);
+   XCTAssertEqual(atomic_load(&resumes), 0);
+   stopGate = nil;
 }
 - (void)testDuplicateBootIsRejected
 {
@@ -241,5 +273,100 @@ static rpcs3_ios_status mockProgress(uint32_t *done, uint32_t *total, char *stag
          object:nil userInfo:@{AVAudioSessionInterruptionTypeKey: @(AVAudioSessionInterruptionTypeEnded)}]];
    XCTAssertEqual(atomic_load(&resumes), 0);
    [self.controller togglePause]; [self until:^BOOL{ return atomic_load(&resumes) == 1; }];
+}
+- (void)testBriefBackgroundDuringBootStillRequiresResume
+{
+   atomic_store(&bootState, RPCS3_IOS_EMULATION_STATE_STARTING);
+   [self boot]; dispatch_semaphore_signal(bootGate);
+   [self until:^BOOL{ return atomic_load(&state) == RPCS3_IOS_EMULATION_STATE_STARTING; }];
+   [self.controller background]; [self.controller foreground];
+   atomic_store(&state, RPCS3_IOS_EMULATION_STATE_RUNNING);
+   [self until:^BOOL{ return !self.controller.busy &&
+         [self.controller.pauseButton.currentTitle isEqualToString:@"Resume"]; }];
+   XCTAssertEqual(atomic_load(&state), RPCS3_IOS_EMULATION_STATE_PAUSED);
+   XCTAssertEqual(atomic_load(&resumes), 0);
+}
+- (void)testBriefInterruptionDuringBootStillRequiresResume
+{
+   atomic_store(&bootState, RPCS3_IOS_EMULATION_STATE_STARTING);
+   [self boot]; dispatch_semaphore_signal(bootGate);
+   [self until:^BOOL{ return atomic_load(&state) == RPCS3_IOS_EMULATION_STATE_STARTING; }];
+   for (NSNumber *type in @[@(AVAudioSessionInterruptionTypeBegan), @(AVAudioSessionInterruptionTypeEnded)])
+      [self.controller audioInterrupted:[NSNotification notificationWithName:AVAudioSessionInterruptionNotification
+            object:nil userInfo:@{AVAudioSessionInterruptionTypeKey: type}]];
+   atomic_store(&state, RPCS3_IOS_EMULATION_STATE_RUNNING);
+   [self until:^BOOL{ return !self.controller.busy &&
+         [self.controller.pauseButton.currentTitle isEqualToString:@"Resume"]; }];
+   XCTAssertEqual(atomic_load(&state), RPCS3_IOS_EMULATION_STATE_PAUSED);
+   XCTAssertEqual(atomic_load(&resumes), 0);
+}
+- (void)testControllerAndTouchSnapshotsClearAfterDisconnect
+{
+   [self boot]; dispatch_semaphore_signal(bootGate);
+   [self until:^BOOL{ return !self.controller.busy; }];
+   GCController *first = [GCController controllerWithExtendedGamepad];
+   GCController *second = [GCController controllerWithExtendedGamepad];
+   [first.extendedGamepad.buttonA setValue:1];
+   [first.extendedGamepad.leftThumbstick setValueForXAxis:0.5 yAxis:-0.75];
+   [first.extendedGamepad.rightThumbstick setValueForXAxis:-0.25 yAxis:1];
+   [first.extendedGamepad.leftTrigger setValue:0.4];
+   [second.extendedGamepad.buttonB setValue:1];
+   self.controller.controllers = @[first, second];
+   self.controller.touchButtons = RPCS3_IOS_PAD_BUTTON_START | RPCS3_IOS_PAD_BUTTON_R2;
+   [self.controller tick];
+   XCTAssertTrue(pads[0].connected); XCTAssertTrue(pads[1].connected); XCTAssertFalse(pads[2].connected);
+   XCTAssertEqual(pads[0].buttons & (RPCS3_IOS_PAD_BUTTON_CROSS | RPCS3_IOS_PAD_BUTTON_START | RPCS3_IOS_PAD_BUTTON_R2),
+         RPCS3_IOS_PAD_BUTTON_CROSS | RPCS3_IOS_PAD_BUTTON_START | RPCS3_IOS_PAD_BUTTON_R2);
+   XCTAssertEqual(pads[1].buttons, RPCS3_IOS_PAD_BUTTON_CIRCLE);
+   XCTAssertEqualWithAccuracy(pads[0].left_stick_x, 0.5, 0.001);
+   XCTAssertEqualWithAccuracy(pads[0].left_stick_y, -0.75, 0.001);
+   XCTAssertEqualWithAccuracy(pads[0].right_stick_x, -0.25, 0.001);
+   XCTAssertEqualWithAccuracy(pads[0].right_stick_y, 1, 0.001);
+   XCTAssertEqualWithAccuracy(pads[0].left_trigger, 0.4, 0.001);
+   XCTAssertEqualWithAccuracy(pads[0].right_trigger, 1, 0.001);
+   self.controller.controllers = @[]; self.controller.touchButtons = 0;
+   [self.controller tick];
+   XCTAssertEqual(pads[0].buttons, 0u); XCTAssertEqual(pads[0].left_stick_x, 0);
+   XCTAssertEqual(pads[0].left_trigger, 0); XCTAssertEqual(pads[0].right_trigger, 0);
+   XCTAssertFalse(pads[1].connected); XCTAssertEqual(pads[1].buttons, 0u);
+}
+- (void)testBriefInterruptionDuringResumePausesAgain
+{
+   [self boot]; dispatch_semaphore_signal(bootGate);
+   [self until:^BOOL{ return !self.controller.busy; }];
+   [self.controller togglePause];
+   [self until:^BOOL{ return !self.controller.pausePending; }];
+   resumeGate = dispatch_semaphore_create(0);
+   [self.controller togglePause];
+   [self until:^BOOL{ return atomic_load(&resumes) == 1; }];
+   for (NSNumber *type in @[@(AVAudioSessionInterruptionTypeBegan), @(AVAudioSessionInterruptionTypeEnded)])
+      [self.controller audioInterrupted:[NSNotification notificationWithName:AVAudioSessionInterruptionNotification
+            object:nil userInfo:@{AVAudioSessionInterruptionTypeKey: type}]];
+   dispatch_semaphore_signal(resumeGate);
+   [self until:^BOOL{ return !self.controller.pausePending && atomic_load(&pauses) == 2; }];
+   XCTAssertEqual(atomic_load(&state), RPCS3_IOS_EMULATION_STATE_PAUSED);
+   XCTAssertEqualObjects(self.controller.pauseButton.currentTitle, @"Resume");
+}
+- (void)testInterruptedControllerCannotRestoreReleasedInput
+{
+   [self boot]; dispatch_semaphore_signal(bootGate);
+   [self until:^BOOL{ return !self.controller.busy; }];
+   GCController *controller = [GCController controllerWithExtendedGamepad];
+   [controller.extendedGamepad.buttonA setValue:1];
+   self.controller.controllers = @[controller]; [self.controller tick];
+   XCTAssertEqual(pads[0].buttons, RPCS3_IOS_PAD_BUTTON_CROSS);
+   [self.controller audioInterrupted:[NSNotification notificationWithName:AVAudioSessionInterruptionNotification
+         object:nil userInfo:@{AVAudioSessionInterruptionTypeKey: @(AVAudioSessionInterruptionTypeBegan)}]];
+   [self.controller tick];
+   XCTAssertEqual(pads[0].buttons, 0u);
+   [self until:^BOOL{ return [self.controller.pauseButton.currentTitle isEqualToString:@"Resume"]; }];
+   [self.controller audioInterrupted:[NSNotification notificationWithName:AVAudioSessionInterruptionNotification
+         object:nil userInfo:@{AVAudioSessionInterruptionTypeKey: @(AVAudioSessionInterruptionTypeEnded)}]];
+   [self.controller tick];
+   XCTAssertEqual(pads[0].buttons, 0u);
+   [self.controller togglePause];
+   [self until:^BOOL{ return !self.controller.pausePending; }];
+   [self.controller tick];
+   XCTAssertEqual(pads[0].buttons, RPCS3_IOS_PAD_BUTTON_CROSS);
 }
 @end

@@ -3,7 +3,10 @@
 This optional RetroArch Lab destination hosts the XITRIX Preview 0.12 native
 ABI 30 core. It is a private experimental build for the M3 iPad Air, not a
 libretro core. The user's standalone RPCS3 0.12 has verified JIT, firmware and
-gameplay; that does not establish gameplay in this new host.
+gameplay. Bridge build 3 reached the game's main menu and passed the real-core
+lifecycle test; the user confirmed audible output in bridge build 4 on October 29.
+Full level gameplay, physical-controller input and in-game save/reload still need
+acceptance in this host.
 
 ## Isolation and behavior
 
@@ -34,8 +37,10 @@ gameplay; that does not establish gameplay in this new host.
   the actual emulation state off the UI thread and enables Pause only after
   startup finishes. Stop remains available during compilation.
 - Backgrounding releases inputs and queues pause, including during boot.
-  Returning to the foreground does not resume play automatically. A failed
-  stop retains the surface and permits retry. The surface is detached only
+  The pause request survives a return to the foreground or an ended interruption
+  before boot/resume finishes. Input stays released until explicit Resume.
+  A failed stop retains the surface, restores input polling and permits retry.
+  The surface is detached only
   after a successful stop; the dylib is never unloaded.
 - Up to seven extended controllers are polled. Touch provides digital buttons;
   a physical controller provides analog sticks. Rumble, RetroArch savestates,
@@ -93,12 +98,15 @@ xcodebuild -project RPCS3BridgeTests.xcodeproj -scheme BridgeTests \
   -destination 'platform=iOS Simulator,id=SIMULATOR_UDID' test
 ```
 
-The thirteen native lifecycle tests inject a fake ABI into the actual bridge
+The nineteen native lifecycle tests inject a fake ABI into the actual bridge
 controller. They cover callback data ownership, duplicate boot rejection,
 stop during boot, stop failure/retry, pause across background/foreground, and
 missing JIT, plus asynchronous startup, backgrounding during that startup,
 pause failure, stopped-startup reporting, audio activation notifications,
-audio activation failure and interruption during boot. They do not execute the device
+audio activation failure, brief interruptions during boot/resume/failed Stop, restored polling
+after failed Stop, and neutral input while interrupted or paused. Controller
+snapshot coverage checks two-player button mapping, both sticks, analog/touch
+triggers and disconnection. They do not execute the device
 RPCS3 binary. The API harness rejects
 ABI 29/31 and each missing required symbol without exposing a partial API.
 The six packager tests cover identity, input preservation, tampering and output
@@ -121,9 +129,10 @@ After importing firmware and a game and initializing PS3, run
 startup, pause/resume, background pause, rotation, stop and reboot checks. It
 allows up to 20 minutes for first-time compilation, captures display evidence,
 and leaves the rebooted title paused. It skips when the device fixture is not
-ready, and can continue an already-starting or running title. Sound, physical
-controller input and in-game save/reload still require
-acceptance on the iPad.
+ready, and can continue an already-starting or running title. Physical controller
+input and in-game save/reload still require acceptance on the iPad. The user's
+sound confirmation applies to build 4; simulator tests do not establish acoustic
+output in later builds.
 
 ## Physical acceptance still required
 

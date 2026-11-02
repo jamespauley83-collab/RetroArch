@@ -79,6 +79,8 @@ static void RALabPS3Log(void *context, int32_t level, const char *message)
 @property(nonatomic, assign) BOOL stopping;
 @property(nonatomic, assign) BOOL backgrounded;
 @property(nonatomic, assign) BOOL pausePending;
+@property(nonatomic, assign) BOOL pauseRequested;
+@property(nonatomic, assign) NSUInteger pauseGeneration;
 @property(nonatomic, assign) BOOL audioInterruption;
 @property(nonatomic, assign) uint64_t touchButtons;
 @property(nonatomic, strong) NSArray<GCController *> *controllers;
@@ -312,6 +314,7 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
    if (self.audioInterruption || ![self activateAudio]) return;
    NSString *titleID = self.games[path.row][@"id"];
    self.playing = YES; self.busy = YES; self.booting = YES;
+   self.pauseRequested = NO;
    NSUInteger generation = ++self.bootGeneration;
    self.status.text = @"Preparing game…";
    [self updateControls]; [self.view layoutIfNeeded];
@@ -343,7 +346,7 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
             self.status.text = paused ? @"Paused." : @"Game running. Save in the game before stopping.";
             [self.pauseButton setTitle:paused ? @"Resume" : @"Pause" forState:UIControlStateNormal];
             [self updateControls];
-            if ((self.backgrounded || self.audioInterruption) && !paused) [self pauseForBackground];
+            if ((self.pauseRequested || self.backgrounded || self.audioInterruption) && !paused) [self pauseForBackground];
          }
          else if (state == RPCS3_IOS_EMULATION_STATE_STOPPED)
          {
@@ -395,7 +398,8 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
 }
 - (void)tick
 {
-   if (!self.playing || self.backgrounded || self.stopping) return;
+   if (!self.playing || self.backgrounded || self.audioInterruption || self.stopping ||
+         self.pausePending || self.pauseRequested || [self.pauseButton.currentTitle isEqualToString:@"Resume"]) return;
    for (unsigned index = 0; index < 7; index++)
    {
       rpcs3_ios_pad_state pad = {0}; pad.struct_size = sizeof(pad);
@@ -464,6 +468,7 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
 {
    if (self.busy || self.pausePending || !self.playing || self.stopping || self.backgrounded || self.audioInterruption) return;
    if ([self.pauseButton.currentTitle isEqualToString:@"Resume"] && ![self activateAudio]) return;
+   NSUInteger generation = self.pauseGeneration;
    self.pausePending = YES; [self releaseInput]; [self updateControls];
    dispatch_async(ra_ps3_queue, ^{
       BOOL resume = ra_ps3_api.get_emulation_state() == RPCS3_IOS_EMULATION_STATE_PAUSED;
@@ -473,24 +478,29 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
          self.pausePending = NO;
          self.status.text = error ?: (resume ? @"Game running." : @"Paused.");
          if (!status) [self.pauseButton setTitle:resume ? @"Pause" : @"Resume" forState:UIControlStateNormal];
+         if (!status && resume && generation == self.pauseGeneration) self.pauseRequested = NO;
          [self updateControls];
-         if (self.backgrounded && resume) [self pauseForBackground];
+         if ((self.pauseRequested || self.backgrounded || self.audioInterruption) && resume) [self pauseForBackground];
       });
    });
 }
 - (void)pauseForBackground
 {
-   if (!self.playing || self.stopping) return;
+   if (!self.playing) return;
+   self.pauseRequested = YES; ++self.pauseGeneration;
    [self releaseInput];
-   if (self.booting) return;
+   if (self.booting || self.pausePending || self.stopping) return;
+   self.pausePending = YES; [self updateControls];
    dispatch_async(ra_ps3_queue, ^{
       rpcs3_ios_emulation_state state = ra_ps3_api.get_emulation_state();
       int status = state == RPCS3_IOS_EMULATION_STATE_RUNNING ? ra_ps3_api.pause_emulation() : 0;
       BOOL paused = !status && (state == RPCS3_IOS_EMULATION_STATE_RUNNING || state == RPCS3_IOS_EMULATION_STATE_PAUSED);
       NSString *error = status ? RALabPS3Error(status) : nil;
       dispatch_async(dispatch_get_main_queue(), ^{
+         self.pausePending = NO;
          if (paused) [self.pauseButton setTitle:@"Resume" forState:UIControlStateNormal];
          if (!self.stopping && (paused || error)) self.status.text = error ?: @"Paused. Tap Resume when ready.";
+         [self updateControls];
       });
    });
 }
@@ -519,8 +529,11 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
          self.busy = NO; self.stopping = NO;
          if (status)
          {
+            self.displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(tick)];
+            [self.displayLink addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
             self.busy = self.booting; self.status.text = error; [self updateControls];
             if (self.booting) [self pollBoot:self.bootGeneration];
+            else if (self.pauseRequested || self.backgrounded || self.audioInterruption) [self pauseForBackground];
             return;
          }
          self.playing = NO; self.booting = NO; [self.pauseButton setTitle:@"Pause" forState:UIControlStateNormal];
