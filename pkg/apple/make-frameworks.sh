@@ -113,7 +113,8 @@ fi
 MVK_PLATFORM_SUBDIR="${SWIFT_PLATFORM_TARGET_PREFIX}-$(echo $ARCHS_STANDARD_64_BIT | sed -e 's/ /_/g')${LLVM_TARGET_TRIPLE_SUFFIX}"
 if [ -d "${MOLTENVK_XCFRAMEWORK}/${MVK_PLATFORM_SUBDIR}/MoltenVK.framework" ] ; then
     echo copying moltenvk from "${MOLTENVK_XCFRAMEWORK}/${MVK_PLATFORM_SUBDIR}/MoltenVK.framework"
-    cp -R "${MOLTENVK_XCFRAMEWORK}/${MVK_PLATFORM_SUBDIR}/MoltenVK.framework" "${OUTDIR}"
+    # Finder metadata from synced source folders prevents framework signing.
+    cp -RX "${MOLTENVK_XCFRAMEWORK}/${MVK_PLATFORM_SUBDIR}/MoltenVK.framework" "${OUTDIR}" || exit 1
     # tvOS App Store rejects arm64e; strip it from the fat MoltenVK binary
     if [ "$PLATFORM_FAMILY_NAME" = "tvOS" -a "$APPSTORE_BUILD" = "1" ] ; then
         MVK_BIN="${OUTDIR}/MoltenVK.framework/MoltenVK"
@@ -122,7 +123,7 @@ if [ -d "${MOLTENVK_XCFRAMEWORK}/${MVK_PLATFORM_SUBDIR}/MoltenVK.framework" ] ; 
             lipo -remove arm64e "$MVK_BIN" -output "$MVK_BIN"
         fi
     fi
-    codesign --force --verbose --sign "${CODE_SIGN_IDENTITY_FOR_ITEMS}" "${OUTDIR}/MoltenVK.framework"
+    codesign --force --verbose --sign "${CODE_SIGN_IDENTITY_FOR_ITEMS}" "${OUTDIR}/MoltenVK.framework" || exit 1
 fi
 
 # iOS 12 needs an older version of MoltenVK

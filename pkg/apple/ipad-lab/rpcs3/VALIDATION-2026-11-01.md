@@ -18,6 +18,8 @@ establish physical controller, full level gameplay or save/reload acceptance.
   permitting another Stop attempt and honoring background pauses received during Stop.
 - Quote the iOS filter-copy paths in the Xcode build phase so the host builds
   from a project directory containing spaces.
+- Copy MoltenVK without extended attributes from synced source folders and fail
+  the build if its copy or signing step fails.
 
 ## Verification
 
@@ -39,10 +41,16 @@ The full ARM64 simulator host then compiled, linked and installed successfully.
 The device shell build could not resolve the Metal component in its restricted
 environment; no successful full device build is claimed for this revision.
 
-The full-app navigation test did not pass: the simulator showed a blank startup
-screen and the PS3 button was absent. The same symptom occurred on iOS 27.2 and
-the previously used iOS 27.0 simulator. The isolated bridge tests above pass, but
-this full-host startup issue must be resolved before installing this revision.
+The first full-app navigation runs showed a blank startup screen. Runtime logging
+traced it to the Vulkan loader: Finder metadata copied from the synced checkout
+prevented MoltenVK signing, and the build script silently continued. Copying the
+framework with `cp -RX` and checking the signing result corrected the packaging.
+The existing failed output's Finder metadata was cleared before rebuilding;
+subsequent builds no longer copy it. Strict framework signature verification
+passed, and the library opens normally. The full-app test
+`testNativeLibraryOpensPS3AndRejectsMissingJIT` passed on both the iPad Air
+simulator (iOS 27.2) and iPhone 18 Pro Max simulator (iOS 27.0). Temporary runtime
+diagnostics were removed before these successful tests.
 
 ## Review findings
 
