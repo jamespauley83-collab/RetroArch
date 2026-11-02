@@ -1,0 +1,12 @@
+diff --git a/.github/workflows/scripts/macos/build-dependencies-embedded.sh b/.github/workflows/scripts/macos/build-dependencies-embedded.sh
+--- a/.github/workflows/scripts/macos/build-dependencies-embedded.sh
++++ b/.github/workflows/scripts/macos/build-dependencies-embedded.sh
+@@ -142,7 +142,7 @@ EOF
+ if ! shasum -sa 256 --check SHASUMS 2> /dev/null; then
+ 	curl -L \
+ 		-O "https://sourceforge.net/projects/freetype/files/freetype2/$FREETYPE/freetype-$FREETYPE.tar.xz" \
+-		-O "https://libsdl.org/release/$SDL.tar.gz" \
++		-O "https://github.com/libsdl-org/SDL/releases/download/release-${SDL#SDL3-}/$SDL.tar.gz" \
+ 		-O "https://github.com/facebook/zstd/releases/download/v$ZSTD/zstd-$ZSTD.tar.gz" \
+ 		-O "https://github.com/lz4/lz4/releases/download/v$LZ4/lz4-$LZ4.tar.gz" \
+ 		-O "https://downloads.sourceforge.net/project/libpng/libpng16/$LIBPNG/libpng-$LIBPNG.tar.xz" \
