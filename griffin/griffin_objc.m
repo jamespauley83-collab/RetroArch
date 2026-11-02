@@ -44,6 +44,9 @@
 #include "../ui/drivers/cocoa/RetroArchLabJIT.m"
 #endif
 #include "../ui/drivers/cocoa/RetroArchLabLibrary.m"
+#ifdef HAVE_RETROARCH_LAB_RPCS3
+#include "../ui/drivers/cocoa/RetroArchLabRPCS3.m"
+#endif
 #endif
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
 #include "../gfx/drivers_context/cocoa_gl_ctx.m"

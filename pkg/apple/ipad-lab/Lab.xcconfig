@@ -7,3 +7,6 @@ OTHER_CFLAGS = $(inherited) -DICLOUD_DRIVE_CONTAINER_NAME=@\"$(LAB_ICLOUD_CONTAI
 // Set only for the optional helper candidate.
 OTHER_CFLAGS = $(inherited) $(LAB_JIT_FLAGS)
 OTHER_LDFLAGS = $(inherited) -framework Security -framework UniformTypeIdentifiers
+
+// Optional native PS3 bridge; core is packaged separately.
+OTHER_CFLAGS = $(inherited) $(LAB_RPCS3_FLAGS)

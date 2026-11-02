@@ -1,0 +1,13 @@
+{
+  "release": "v0.12",
+  "repository": "https://github.com/XITRIX/RPCS3-iOS-Releases",
+  "asset": "RPCS3-ios-arm64-armv8.4-a-unsigned.ipa",
+  "ipa_sha256": "c315c9e02ee0367ce231493ba4b5ae9ed46f95e7420e5780d490e3cb4e570358",
+  "core_sha256": "64c942bc435d82627f7ad223ed091be76e1e2ba112c7f95d3596e68c31188237",
+  "abi": 30,
+  "header_repository": "https://github.com/XITRIX/rpcs3",
+  "header_commit": "f88bff947b83730c0cf8a3949f59338b992b3ca0",
+  "header_path": "rpcs3/ios/RPCS3IOS.h",
+  "bundle_id": "com.jamespauley.retroarchlab.ps3bridge",
+  "display_name": "RetroArch PS3 Bridge"
+}

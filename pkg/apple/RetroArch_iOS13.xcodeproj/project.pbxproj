@@ -1491,7 +1491,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [ -n \"${APPSTORE_BUILD}\" ] ; then\n    rm -f ${SRCROOT}/iOS/modules/*.dylib\n    ./update-cores.sh appstore\n    ./rebuild-assets.sh -d -i -o -x\nfi\n\n./make-frameworks.sh\n#./code-sign-cores.sh\n\nmkdir -p ${SRCROOT}/iOS/filters/audio\ncp -f ${SRCBASE}/libretro-common/audio/dsp_filters/*.dsp ${SRCROOT}/iOS/filters/audio/\nmkdir -p ${SRCROOT}/iOS/filters/video\ncp -f ${SRCBASE}/gfx/video_filters/*.filt ${SRCROOT}/iOS/filters/video/\n";
+			shellScript = "if [ -n \"${APPSTORE_BUILD}\" ] ; then\n    rm -f ${SRCROOT}/iOS/modules/*.dylib\n    ./update-cores.sh appstore\n    ./rebuild-assets.sh -d -i -o -x\nfi\n\n./make-frameworks.sh || exit $?\n#./code-sign-cores.sh\n\nmkdir -p \"${SRCROOT}/iOS/filters/audio\"\ncp -f \"${SRCBASE}\"/libretro-common/audio/dsp_filters/*.dsp \"${SRCROOT}/iOS/filters/audio/\"\nmkdir -p \"${SRCROOT}/iOS/filters/video\"\ncp -f \"${SRCBASE}\"/gfx/video_filters/*.filt \"${SRCROOT}/iOS/filters/video/\"\n";
 		};
 		92CC057521FE2D4900FF79F0 /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -1509,7 +1509,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "if [ -n \"${APPSTORE_BUILD}\" ] ; then\n    rm -f ${SRCROOT}/tvOS/modules/*.dylib\n    ./update-cores.sh --tvos appstore\n    ./rebuild-assets.sh -d -i -o -x\nfi\n\n./make-frameworks.sh tvos\n#./code-sign-cores.sh tvos\n\nmkdir -p ${SRCROOT}/tvOS/filters/audio\ncp -f ${SRCBASE}/libretro-common/audio/dsp_filters/*.dsp ${SRCROOT}/tvOS/filters/audio/\nmkdir -p ${SRCROOT}/tvOS/filters/video\ncp -f ${SRCBASE}/gfx/video_filters/*.filt ${SRCROOT}/tvOS/filters/video/\n";
+			shellScript = "if [ -n \"${APPSTORE_BUILD}\" ] ; then\n    rm -f ${SRCROOT}/tvOS/modules/*.dylib\n    ./update-cores.sh --tvos appstore\n    ./rebuild-assets.sh -d -i -o -x\nfi\n\n./make-frameworks.sh tvos || exit $?\n#./code-sign-cores.sh tvos\n\nmkdir -p ${SRCROOT}/tvOS/filters/audio\ncp -f ${SRCBASE}/libretro-common/audio/dsp_filters/*.dsp ${SRCROOT}/tvOS/filters/audio/\nmkdir -p ${SRCROOT}/tvOS/filters/video\ncp -f ${SRCBASE}/gfx/video_filters/*.filt ${SRCROOT}/tvOS/filters/video/\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
