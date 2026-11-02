@@ -2,6 +2,7 @@ import copy
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import plistlib
 import shutil
@@ -14,6 +15,56 @@ import zipfile
 spec = importlib.util.spec_from_file_location('ipad_build', Path(__file__).resolve().parents[1] / 'build.py')
 build = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(build)
+
+
+class FrameworkPhaseTests(unittest.TestCase):
+    @unittest.skipIf(os.name == 'nt', 'POSIX executable permissions')
+    def test_framework_script_is_executable(self):
+        script = build.ROOT / 'pkg/apple/make-frameworks.sh'
+        self.assertTrue(os.access(script, os.X_OK))
+
+    def run_phase(self, platform, exit_code=0, executable=True):
+        project = build.ROOT / 'pkg/apple/RetroArch_iOS13.xcodeproj/project.pbxproj'
+        phases = [json.loads(line.split('=', 1)[1].strip().removesuffix(';'))
+                  for line in project.read_text().splitlines()
+                  if 'shellScript = ' in line and './make-frameworks.sh' in line]
+        phase = next(script for script in phases
+                     if ('./make-frameworks.sh tvos' in script) == (platform == 'tvOS'))
+        temp = tempfile.TemporaryDirectory(prefix='lab phase ' if platform == 'iOS' else 'lab-phase-')
+        self.addCleanup(temp.cleanup)
+        root = Path(temp.name)
+        apple = root / 'pkg/apple'
+        apple.mkdir(parents=True)
+        for directory, filename in [('libretro-common/audio/dsp_filters', 'test.dsp'),
+                                    ('gfx/video_filters', 'test.filt')]:
+            target = root / directory / filename
+            target.parent.mkdir(parents=True)
+            target.write_text('filter fixture')
+        script = apple / 'make-frameworks.sh'
+        script.write_text('#!/bin/sh\nexit ' + str(exit_code) + '\n')
+        script.chmod(0o755 if executable else 0o644)
+        result = subprocess.run(['/bin/sh', '-c', phase], cwd=apple,
+                                env=dict(os.environ, APPSTORE_BUILD='',
+                                         SRCROOT=str(apple), SRCBASE=str(root)),
+                                capture_output=True, text=True)
+        return result, apple / platform / 'filters'
+
+    @unittest.skipIf(os.name == 'nt', 'POSIX shell build phase')
+    def test_framework_failure_stops_phase(self):
+        for platform in ('iOS', 'tvOS'):
+            for executable in (True, False):
+                with self.subTest(platform=platform, executable=executable):
+                    result, filters = self.run_phase(platform, 42, executable)
+                    self.assertEqual(result.returncode, 42 if executable else 126,
+                                     result.stdout + result.stderr)
+                    self.assertFalse(filters.exists())
+
+    @unittest.skipIf(os.name == 'nt', 'POSIX shell build phase')
+    def test_ios_success_copies_filters_from_paths_with_spaces(self):
+        result, filters = self.run_phase('iOS')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual((filters / 'audio/test.dsp').read_text(), 'filter fixture')
+        self.assertEqual((filters / 'video/test.filt').read_text(), 'filter fixture')
 
 
 class PackagingTests(unittest.TestCase):
