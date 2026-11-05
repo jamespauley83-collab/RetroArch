@@ -45,7 +45,7 @@ bool ra_lab_game_mode_quiet_enabled(void)
       return @"Hides routine RetroArch popups while a game is running. Warnings, errors, higher-priority messages and accessibility announcements stay available. Menus and the performance recorder are unchanged.";
    if (section == 1)
       return @"iOS/iPadOS controls system resource priority. This app supports Game Mode, but cannot force it on or confirm its current state. Keep the game full screen.";
-   return @"Gaming Focus handles banners from other apps. RetroArch cannot turn it on for you or stop other apps from receiving notifications. Allowed people, time-sensitive notifications and emergency exceptions can still interrupt. PS3 also uses Apple Game Mode and Gaming Focus.";
+   return @"Gaming Focus handles banners from other apps. RetroArch cannot turn it on for you or stop other apps from receiving notifications. Allowed people, time-sensitive notifications and emergency exceptions can still interrupt.";
 }
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)path
 {
