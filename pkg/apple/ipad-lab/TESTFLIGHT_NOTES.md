@@ -8,10 +8,14 @@ For each upload, save build-specific notes in App Store Connect's **What to Test
 field and reopen the build to verify them before making it available to testers.
 App-level Test Information and pull request notes do not replace that field.
 
-## Prepared notes: 1.22.2 (10)
+## Published notes: 1.22.2 (10)
 
-These notes are prepared for the internal TestFlight package. Their presence here
-does not confirm that Apple has processed or distributed the build.
+Apple completed processing build 10 on November 5, 2026 (UTC), and marked it
+Ready to Test. The following English (U.S.) notes were saved in What to Test,
+then verified by leaving and reopening the build. The build was subsequently
+added to Owner validation, with one internal tester.
+
+[Build 10 in App Store Connect](https://appstoreconnect.apple.com/teams/624c8dce-c9b4-4f3d-9765-088e197cdb71/apps/6830930218/testflight/ios/c8f2932d-72a5-40da-8ce9-561952e0f668)
 
 RetroArch Lab 1.22.2 (10) — Game Mode and performance recording
 
