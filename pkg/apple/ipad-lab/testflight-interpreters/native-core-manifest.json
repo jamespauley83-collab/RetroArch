@@ -1,0 +1,38 @@
+{
+  "build": 11,
+  "version": "1.22.2",
+  "platform": "iOS arm64",
+  "build_sdk": "27.2",
+  "host_unsigned_sha256": "72537c501dd4f6c260c1f053069aa078d83d0ec61747ed283232f2437d426808",
+  "armsx2": {
+    "repository": "https://github.com/ARMSX2/ARMSX2",
+    "commit": "e58489d349cdcd635fc6264546087e347c84bf8c",
+    "base_patches": "../experiments/armsx2/patches",
+    "distribution_patch": "armsx2-no-jit.patch",
+    "unsigned_sha256": "ff18163da440fcf6c90557bdf77bc397af062254d0f9a0efd129eb0da3e5fb0e"
+  },
+  "rpcs3": {
+    "repository": "https://github.com/XITRIX/rpcs3",
+    "commit": "f88bff947b83730c0cf8a3949f59338b992b3ca0",
+    "abi": 30,
+    "distribution_patch": "rpcs3-interpreter-only.patch",
+    "patch_sha256": "d1ad9b5ddfded01dcd1e102a42c16873486a501844989b509a91c24fadbfb92a",
+    "unsigned_sha256": "8f7510a8bb91399b8af0dadbb73287698558c335963b5d685d02e70622682795",
+    "llvm": false,
+    "jit": false
+  },
+  "dependencies": [
+    {
+      "name": "MoltenVK",
+      "version": "1.4.2",
+      "url": "https://github.com/KhronosGroup/MoltenVK/releases/download/v1.4.2/MoltenVK-ios.tar",
+      "sha256": "b5d947b1660e6e9fed40b9cd2387e160aaab9e80b775c0cef7e14059405178c1"
+    },
+    {
+      "name": "FFmpeg",
+      "version": "8.1.1",
+      "url": "https://ffmpeg.org/releases/ffmpeg-8.1.1.tar.xz",
+      "sha256": "b6863adde98898f42602017462871b5f6333e65aec803fdd7a6308639c52edf3"
+    }
+  ]
+}

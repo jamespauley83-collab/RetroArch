@@ -8,7 +8,7 @@
 #ifdef HAVE_RETROARCH_LAB_RPCS3
 #import "RetroArchLabRPCS3.h"
 #endif
-#ifdef HAVE_RETROARCH_LAB_STIKJIT
+#if defined(HAVE_RETROARCH_LAB_STIKJIT) && !defined(HAVE_RETROARCH_LAB_TESTFLIGHT)
 #import "RetroArchLabJIT.h"
 #endif
 #import "RetroArchLabLibrarySupport.h"
@@ -131,7 +131,7 @@ bool cocoa_lab_library_visible(void) { return ra_lab_library_visible; }
          UIBarButtonSystemItemRefresh target:self action:@selector(reloadLibrary)];
    refresh.accessibilityLabel = @"Refresh game library";
    self.navigationItem.rightBarButtonItems = @[advanced, refresh];
-#ifdef HAVE_RETROARCH_LAB_STIKJIT
+#if defined(HAVE_RETROARCH_LAB_STIKJIT) && !defined(HAVE_RETROARCH_LAB_TESTFLIGHT)
    UIBarButtonItem *jit = [[UIBarButtonItem alloc] initWithTitle:@"JIT Setup"
          style:UIBarButtonItemStylePlain target:self action:@selector(openJITSetup)];
    self.navigationItem.rightBarButtonItems = @[advanced, jit, refresh];
@@ -288,6 +288,10 @@ bool cocoa_lab_library_visible(void) { return ra_lab_library_visible; }
    [self.systemButton setTitle:self.selectedSystem ?: @"All systems" forState:UIControlStateNormal];
    self.statusLabel.text = [NSString stringWithFormat:@"%lu games%@",
          (unsigned long)result.count, self.section.selectedSegmentIndex == 1 ? @" (latest 10)" : @""];
+#ifdef HAVE_RETROARCH_LAB_TESTFLIGHT
+   self.statusLabel.text = [self.statusLabel.text stringByAppendingString:
+         @" · Interpreter mode for PS2, PS3 and GameCube/Wii. Performance varies by game."];
+#endif
    self.emptyLabel.text = self.library.count ? @"No games match this view.\nTry another filter or search." :
          @"Your library starts here.\n\nUse Advanced > Import Content to scan your games.\nRecently played games also appear here.\n\nNo game files are moved or renamed.";
    self.emptyLabel.hidden = result.count != 0;
@@ -385,7 +389,7 @@ bool cocoa_lab_library_visible(void) { return ra_lab_library_visible; }
          command_event(CMD_EVENT_MENU_TOGGLE, NULL);
    }];
 }
-#ifdef HAVE_RETROARCH_LAB_STIKJIT
+#if defined(HAVE_RETROARCH_LAB_STIKJIT) && !defined(HAVE_RETROARCH_LAB_TESTFLIGHT)
 - (void)openJITSetup
 {
 #ifdef HAVE_RETROARCH_LAB_RPCS3
@@ -409,7 +413,7 @@ bool cocoa_lab_library_visible(void) { return ra_lab_library_visible; }
    if (RALabRPCS3Loaded())
    { [self showProblem:@"Restart this test app before switching from PS3 to another system."]; return; }
 #endif
-#ifdef HAVE_RETROARCH_LAB_STIKJIT
+#if defined(HAVE_RETROARCH_LAB_STIKJIT) && !defined(HAVE_RETROARCH_LAB_TESTFLIGHT)
    NSString *identifier = RALabCoreIdentifier(core);
    if ([@[@"armsx2", @"dolphin", @"play"] containsObject:identifier])
    {
@@ -458,6 +462,9 @@ bool cocoa_lab_library_visible(void) { return ra_lab_library_visible; }
          if (cores->list[i].path)
          {
             NSString *corePath = [NSString stringWithUTF8String:cores->list[i].path];
+#ifdef HAVE_RETROARCH_LAB_TESTFLIGHT
+            if ([RALabCoreIdentifier(corePath) isEqualToString:@"play"]) continue;
+#endif
             if ([files isReadableFileAtPath:corePath]) [installed addObject:corePath];
          }
    NSString *assigned = game.corePath;
@@ -466,11 +473,15 @@ bool cocoa_lab_library_visible(void) { return ra_lab_library_visible; }
       fill_pathname_expand_special(expanded, assigned.UTF8String, sizeof(expanded));
       assigned = [NSString stringWithUTF8String:expanded];
    }
+#ifdef HAVE_RETROARCH_LAB_TESTFLIGHT
+   if ([RALabCoreIdentifier(assigned) isEqualToString:@"play"])
+   { [self showProblem:@"This PS2 playlist uses Play!. Select ARMSX2 for this game in Advanced to use the TestFlight interpreter. ARMSX2 requires your PS2 BIOS."]; return; }
+#endif
    NSString *core = RALabResolveCore(assigned, installed);
    if (!core)
    { [self showProblem:@"Assign an installed core to this game or playlist in Advanced. The library will not guess a console from .iso or .chd."]; return; }
+#if !defined(HAVE_RETROARCH_LAB_STIKJIT) && !defined(HAVE_RETROARCH_LAB_TESTFLIGHT)
    NSString *identifier = RALabCoreIdentifier(core);
-#ifndef HAVE_RETROARCH_LAB_STIKJIT
    /* ARMSX2 checks and allocates its required arena in retro_load_game. */
    if (([identifier isEqualToString:@"dolphin"] || [identifier isEqualToString:@"play"]) && !jit_available())
    {

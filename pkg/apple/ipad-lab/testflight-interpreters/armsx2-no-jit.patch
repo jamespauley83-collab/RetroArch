@@ -1,0 +1,59 @@
+--- a/pcsx2-libretro/CMakeLists.txt
++++ b/pcsx2-libretro/CMakeLists.txt
+@@ -46,6 +46,14 @@
+ add_custom_target(armsx2_libretro)
+ add_dependencies(armsx2_libretro pcsx2-libretro)
+ 
++option(RETROARCH_LAB_ARMSX2_NO_JIT "Run the Lab core using existing interpreter providers only" OFF)
++if(RETROARCH_LAB_ARMSX2_NO_JIT)
++    if(NOT IOS OR NOT RETROARCH_LAB_ARMSX2_BRIDGE OR RETROARCH_LAB_ARMSX2_BUILD_PROBE)
++        message(FATAL_ERROR "Interpreter distribution requires the iOS Lab bridge and no build-probe gate")
++    endif()
++    target_compile_definitions(pcsx2-libretro PRIVATE RETROARCH_LAB_ARMSX2_NO_JIT=1)
++endif()
++
+ if(RETROARCH_LAB_ARMSX2_DEVICE_TEST)
+     if(RETROARCH_LAB_ARMSX2_BUILD_PROBE OR NOT RETROARCH_LAB_ARMSX2_BRIDGE)
+         message(FATAL_ERROR "Device testing requires the bridge and must not enable the build-probe gate")
+--- a/pcsx2-libretro/Main.cpp
++++ b/pcsx2-libretro/Main.cpp
+@@ -19,6 +19,9 @@
+ 
+ #ifdef RETROARCH_LAB_ARMSX2_BRIDGE
+ #include "common/LabFrontend.h"
++#ifdef RETROARCH_LAB_ARMSX2_NO_JIT
++#include "common/Darwin/DarwinMisc.h"
++#endif
+ #endif
+ #include <algorithm>
+ #include <atomic>
+@@ -1852,6 +1855,19 @@
+ 		s_base_settings->SetIntValue("EmuCore/GS", "Renderer", static_cast<int>(GSRendererType::Metal));
+ 		VMManager::Internal::LoadStartupSettings();
+ 	}
++#ifdef RETROARCH_LAB_ARMSX2_NO_JIT
++	// Use upstream interpreter providers; do not request executable memory.
++	// SysMemory skips code allocation when this boot-scoped override is set.
++	// VMManager then clamps subsequent settings reloads to all four interpreters.
++	DarwinMisc::iPSX2_FORCE_EE_INTERP = 1;
++	EmuConfig.Cpu.Recompiler.EnableEE = false;
++	EmuConfig.Cpu.Recompiler.EnableIOP = false;
++	EmuConfig.Cpu.Recompiler.EnableVU0 = false;
++	EmuConfig.Cpu.Recompiler.EnableVU1 = false;
++	EmuConfig.Cpu.Recompiler.EnableFastmem = false;
++	EmuConfig.Speedhacks.vuThread = false;
++	log_cb(RETRO_LOG_INFO, "ARMSX2 interpreter mode: EE/IOP/VU0/VU1, no executable arena, fastmem or MTVU.\n");
++#else
+ 	LabFrontend::ArenaReport arena_report;
+ 	const bool arena_ready = LabFrontend::Code.Prepare(environ_cb, HostMemoryMap::CodeSize, &arena_report);
+ 	log_cb(arena_ready ? RETRO_LOG_INFO : RETRO_LOG_ERROR,
+@@ -1895,6 +1911,9 @@
+ 		return false;
+ 	}
+ 	log_cb(RETRO_LOG_INFO, "ARMSX2 Lab device test: experimental boot; JIT execute/patch test passed.\n");
++#endif // RETROARCH_LAB_ARMSX2_DEVICE_TEST
++#endif // RETROARCH_LAB_ARMSX2_NO_JIT
++#ifdef RETROARCH_LAB_ARMSX2_DEVICE_TEST
+ 	s_boot_error.clear();
+ 	s_boot_failed.store(false, std::memory_order_release);
+ #endif

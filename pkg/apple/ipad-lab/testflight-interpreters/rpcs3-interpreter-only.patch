@@ -1,0 +1,247 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index d03e6ec..fc6a714 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -83,6 +83,12 @@ if(RPCS3_FRONTEND STREQUAL "IOS")
+         add_compile_definitions(RPCS3_MACOS=1)
+     endif()
+ 
++    option(RPCS3_IOS_JITLESS_ONLY "Build native interpreters without executable-memory support" OFF)
++    if(RPCS3_IOS_JITLESS_ONLY)
++        add_compile_definitions(RPCS3_IOS_JITLESS_ONLY=1)
++        set(WITH_LLVM OFF CACHE BOOL "" FORCE)
++    endif()
++
+     add_compile_definitions(RPCS3_IOS=1)
+     add_compile_options(
+         "$<$<COMPILE_LANGUAGE:C,CXX>:-ffile-prefix-map=${CMAKE_SOURCE_DIR}=rpcs3>"
+diff --git a/rpcs3/Emu/CMakeLists.txt b/rpcs3/Emu/CMakeLists.txt
+index 59e5ef4..7b228fc 100644
+--- a/rpcs3/Emu/CMakeLists.txt
++++ b/rpcs3/Emu/CMakeLists.txt
+@@ -100,11 +100,15 @@ if(APPLE)
+ endif()
+ 
+ if(RPCS3_FRONTEND STREQUAL "IOS")
++    if(RPCS3_IOS_JITLESS_ONLY)
++        target_sources(rpcs3_emu PRIVATE ../../Utilities/JITIOSInterpreter.cpp)
++    else()
++        target_sources(rpcs3_emu PRIVATE ../../Utilities/JITIOS.cpp)
++    endif()
+     target_sources(rpcs3_emu PRIVATE
+         Io/IOS/IOSPadHandler.cpp
+         Io/IOS/IOSPadHandler.h
+         ../../Utilities/JITArenaAllocator.h
+-        ../../Utilities/JITIOS.cpp
+         ../../Utilities/JITIOS.h
+         ../../Utilities/JITIOSLayoutPolicy.h
+         ../ios/FrontendSupport.cpp
+@@ -124,9 +128,7 @@ if(RPCS3_FRONTEND STREQUAL "IOS")
+         ../Input/ps_move_config.cpp
+         ../Input/ps_move_tracker.cpp
+         ../rpcs3_version.cpp
+-        CPU/Backends/AArch64/AArch64ASM.cpp
+         CPU/Backends/AArch64/AArch64Common.cpp
+-        CPU/Backends/AArch64/AArch64JIT.cpp
+         CPU/Backends/AArch64/AArch64Signal.cpp
+     )
+ endif()
+@@ -472,6 +474,14 @@ if(NOT MSVC)
+     )
+ endif()
+ 
++if(WITH_LLVM AND (RPCS3_FRONTEND STREQUAL "IOS" OR CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64|arm64|aarch64"))
++    target_sources(rpcs3_emu PRIVATE
++        CPU/Backends/AArch64/AArch64ASM.cpp
++        CPU/Backends/AArch64/AArch64JIT.cpp
++    )
++endif()
++
++
+ # CPU
+ target_sources(rpcs3_emu PRIVATE
+     CPU/CPUThread.cpp
+@@ -480,9 +490,7 @@ target_sources(rpcs3_emu PRIVATE
+ 
+ if(CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64|arm64|aarch64")
+     target_sources(rpcs3_emu PRIVATE
+-        CPU/Backends/AArch64/AArch64ASM.cpp
+         CPU/Backends/AArch64/AArch64Common.cpp
+-        CPU/Backends/AArch64/AArch64JIT.cpp
+         CPU/Backends/AArch64/AArch64Signal.cpp
+     )
+ endif()
+diff --git a/rpcs3/Emu/Cell/SPUCommonRecompiler.cpp b/rpcs3/Emu/Cell/SPUCommonRecompiler.cpp
+index d062d98..a19eb7c 100644
+--- a/rpcs3/Emu/Cell/SPUCommonRecompiler.cpp
++++ b/rpcs3/Emu/Cell/SPUCommonRecompiler.cpp
+@@ -1521,7 +1521,7 @@ spu_runtime::spu_runtime()
+ 		fs::write_file(m_cache_path + "spu-ir.log", fs::rewrite);
+ 	}
+ 
+-#ifdef RPCS3_IOS
++#if defined(RPCS3_IOS) && defined(LLVM_AVAILABLE)
+ 	if (rpcs3::ios::get_experimental_policy().persistent_spu_object_cache)
+ 	{
+ 		// v6 includes the host reservation stride baked into generated addresses.
+diff --git a/rpcs3/ios/IOSCoreBuildProfile.h b/rpcs3/ios/IOSCoreBuildProfile.h
+index 0585309..48d65c3 100644
+--- a/rpcs3/ios/IOSCoreBuildProfile.h
++++ b/rpcs3/ios/IOSCoreBuildProfile.h
+@@ -6,3 +6,9 @@
+ #else
+ #define RPCS3_IOS_CORE_BUILD_PROFILE_JSON "\"core_variant\":\"modern\",\"cpu_baseline\":\"armv8.4-a\",\"legacy_cpu_compatibility\":false,"
+ #endif
++
++#ifdef RPCS3_IOS_JITLESS_ONLY
++#define RPCS3_IOS_EXECUTION_BUILD_PROFILE_JSON "\"llvm\":null,\"jit\":\"disabled\",\"execution_mode\":\"RPCS3 interpreter-only distribution\","
++#else
++#define RPCS3_IOS_EXECUTION_BUILD_PROFILE_JSON "\"llvm\":\"ca7933e47d3a3451d81e72ac174dcb5aa28b59d1\",\"jit\":\"sealed-arena\","
++#endif
+diff --git a/rpcs3/ios/RPCS3IOS.cpp b/rpcs3/ios/RPCS3IOS.cpp
+index 1368e17..8320fb2 100644
+--- a/rpcs3/ios/RPCS3IOS.cpp
++++ b/rpcs3/ios/RPCS3IOS.cpp
+@@ -1332,9 +1332,9 @@ extern "C" uint32_t rpcs3_ios_abi_version(void) noexcept
+ extern "C" const char* rpcs3_ios_build_info(void) noexcept
+ {
+ #ifdef RPCS3_MACOS
+-	return "{\"abi\":30," RPCS3_IOS_CORE_BUILD_PROFILE_JSON "\"frontend\":\"macos\",\"upstream\":\"06ae1af55161e8a9e8ad77395a97455d493b5cb3\",\"llvm\":\"ca7933e47d3a3451d81e72ac174dcb5aa28b59d1\",\"jit\":\"sealed-arena\",\"renderer\":\"vulkan-moltenvk-kosmickrisp\",\"moltenvk\":\"1.4.2\",\"ffmpeg\":\"8.1.1\",\"audio\":\"coreaudio-default-output\",\"input\":\"gamecontroller-multiplayer-rumble\",\"games\":\"pkg-rap-iso-zip-folder-updates-runtime-patches-library-delete-cache-management-trophies-big-picture-savestate-management-selected-boot\",\"settings\":\"global-and-per-game-cfg-root-catalog-title-database-recommendations-presets\",\"rpcn\":\"servers-account-social-online\",\"performance\":\"fps-cpu-rsx-memory\",\"lifecycle\":\"pause-resume-stop-big-picture\",\"media_codecs\":true}";
++	return "{\"abi\":30," RPCS3_IOS_CORE_BUILD_PROFILE_JSON "\"frontend\":\"macos\",\"upstream\":\"06ae1af55161e8a9e8ad77395a97455d493b5cb3\"," RPCS3_IOS_EXECUTION_BUILD_PROFILE_JSON "\"renderer\":\"vulkan-moltenvk-kosmickrisp\",\"moltenvk\":\"1.4.2\",\"ffmpeg\":\"8.1.1\",\"audio\":\"coreaudio-default-output\",\"input\":\"gamecontroller-multiplayer-rumble\",\"games\":\"pkg-rap-iso-zip-folder-updates-runtime-patches-library-delete-cache-management-trophies-big-picture-savestate-management-selected-boot\",\"settings\":\"global-and-per-game-cfg-root-catalog-title-database-recommendations-presets\",\"rpcn\":\"servers-account-social-online\",\"performance\":\"fps-cpu-rsx-memory\",\"lifecycle\":\"pause-resume-stop-big-picture\",\"media_codecs\":true}";
+ #else
+-	return "{\"abi\":30," RPCS3_IOS_CORE_BUILD_PROFILE_JSON "\"frontend\":\"ios\",\"upstream\":\"06ae1af55161e8a9e8ad77395a97455d493b5cb3\",\"llvm\":\"ca7933e47d3a3451d81e72ac174dcb5aa28b59d1\",\"jit\":\"sealed-arena\",\"renderer\":\"vulkan-moltenvk-kosmickrisp\",\"moltenvk\":\"1.4.2\",\"ffmpeg\":\"8.1.1\",\"audio\":\"remoteio\",\"input\":\"gamecontroller-multiplayer-rumble\",\"games\":\"pkg-rap-iso-zip-folder-updates-runtime-patches-library-delete-cache-management-trophies-big-picture-savestate-management-selected-boot\",\"settings\":\"global-and-per-game-cfg-root-catalog-title-database-recommendations-presets\",\"rpcn\":\"servers-account-social-online\",\"performance\":\"fps-cpu-rsx-memory\",\"lifecycle\":\"pause-resume-stop-big-picture\",\"media_codecs\":true}";
++	return "{\"abi\":30," RPCS3_IOS_CORE_BUILD_PROFILE_JSON "\"frontend\":\"ios\",\"upstream\":\"06ae1af55161e8a9e8ad77395a97455d493b5cb3\"," RPCS3_IOS_EXECUTION_BUILD_PROFILE_JSON "\"renderer\":\"vulkan-moltenvk-kosmickrisp\",\"moltenvk\":\"1.4.2\",\"ffmpeg\":\"8.1.1\",\"audio\":\"remoteio\",\"input\":\"gamecontroller-multiplayer-rumble\",\"games\":\"pkg-rap-iso-zip-folder-updates-runtime-patches-library-delete-cache-management-trophies-big-picture-savestate-management-selected-boot\",\"settings\":\"global-and-per-game-cfg-root-catalog-title-database-recommendations-presets\",\"rpcn\":\"servers-account-social-online\",\"performance\":\"fps-cpu-rsx-memory\",\"lifecycle\":\"pause-resume-stop-big-picture\",\"media_codecs\":true}";
+ #endif
+ }
+ 
+@@ -1449,7 +1449,11 @@ extern "C" rpcs3_ios_status rpcs3_ios_initialize(const rpcs3_ios_config* config)
+ 		if (!footprint_diagnostics.empty()) emit_log(4, footprint_diagnostics);
+ 		if (jit_stats.backend == rpcs3::ios::jit::arena_backend::disabled)
+ 		{
++#ifdef RPCS3_IOS_JITLESS_ONLY
++			emit_log(4, "RPCS3 interpreter-only distribution: native PPU/SPU interpreters; executable allocator excluded");
++#else
+ 			emit_log(4, "JIT-less mode: 0-byte code/data arenas; native PPU/SPU interpreters; no Universal JIT initialization");
++#endif
+ 		}
+ 		else if (jit_stats.backend == rpcs3::ios::jit::arena_backend::universal_mirrored)
+ 		{
+--- /dev/null
++++ b/Utilities/JITIOSInterpreter.cpp
+@@ -0,0 +1,116 @@
++#include "JITIOS.h"
++
++#if !defined(RPCS3_IOS) || !defined(RPCS3_IOS_JITLESS_ONLY)
++#error "JITIOSInterpreter.cpp requires the interpreter-only Apple mobile build"
++#endif
++
++#include <atomic>
++
++namespace
++{
++std::atomic_bool g_sealed{false};
++}
++
++namespace rpcs3::ios::jit
++{
++memory_mode selected_memory_mode() noexcept
++{
++	return memory_mode::arena;
++}
++
++bool uses_regular_memory() noexcept
++{
++	return false;
++}
++
++regular_allocator::~regular_allocator()
++{
++	(void)m_group;
++}
++
++void* regular_allocator::allocate(bool, usz, usz) noexcept
++{
++	return nullptr;
++}
++
++bool is_jitless() noexcept
++{
++	return true;
++}
++
++bool is_ready() noexcept
++{
++	return false;
++}
++
++bool prepare_arena() noexcept
++{
++	return true;
++}
++
++bool prepare_arena(u32) noexcept
++{
++	return true;
++}
++
++bool seal_arena() noexcept
++{
++	g_sealed.store(true, std::memory_order_relaxed);
++	return true;
++}
++
++void* runtime_memory(bool) noexcept
++{
++	return nullptr;
++}
++
++usz arena_capacity(bool) noexcept
++{
++	return 0;
++}
++
++bool claim_runtime(bool, usz, usz size) noexcept
++{
++	return size == 0;
++}
++
++void reset_runtime() noexcept
++{
++}
++
++void* allocate(bool, usz, usz) noexcept
++{
++	return nullptr;
++}
++
++void release_allocation(bool, void*, usz) noexcept
++{
++}
++
++void* writable(const void*, usz) noexcept
++{
++	return nullptr;
++}
++
++void flush(const void*, usz) noexcept
++{
++}
++
++arena_statistics get_statistics() noexcept
++{
++	arena_statistics result;
++	result.backend = arena_backend::disabled;
++	result.sealed = g_sealed.load(std::memory_order_relaxed);
++	return result;
++}
++
++std::string no_footprint_diagnostics()
++{
++	return {};
++}
++
++const char* last_error() noexcept
++{
++	return "RPCS3 interpreter-only distribution does not allocate executable memory";
++}
++}

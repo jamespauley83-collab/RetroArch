@@ -1446,6 +1446,10 @@ static core_option_manager_t *runloop_init_core_variables(
    return NULL;
 }
 
+#ifdef HAVE_RETROARCH_LAB_TESTFLIGHT
+#include "pkg/apple/ipad-lab/TestFlightPolicy.h"
+#endif
+
 static void runloop_core_msg_queue_push(
       struct retro_system_av_info *av_info,
       const struct retro_message_ext *msg)
@@ -1548,6 +1552,23 @@ bool runloop_environment_cb(unsigned cmd, void *data)
                return true;
 
             var->value = NULL;
+#ifdef HAVE_RETROARCH_LAB_TESTFLIGHT
+            var->value = ra_lab_testflight_core_option(var->key);
+            if (var->value)
+            {
+               if (runloop_st->core_options)
+               {
+#ifdef HAVE_RUNAHEAD
+                  if (runloop_st->core_options->updated)
+                     runloop_st->flags |= RUNLOOP_FLAG_HAS_VARIABLE_UPDATE;
+#endif
+                  runloop_st->core_options->updated = false;
+                  core_option_manager_set_display(runloop_st->core_options,
+                        var->key, false);
+               }
+               return true;
+            }
+#endif
 
             if (!runloop_st->core_options)
             {
@@ -1602,6 +1623,12 @@ bool runloop_environment_cb(unsigned cmd, void *data)
                      var->key, "Not implemented");
                return false;
             }
+
+#ifdef HAVE_RETROARCH_LAB_TESTFLIGHT
+            if (ra_lab_testflight_core_option(var->key))
+               return string_is_equal(var->value,
+                     ra_lab_testflight_core_option(var->key));
+#endif
 
             /* Check whether key is valid */
             if (!core_option_manager_get_idx(runloop_st->core_options,
@@ -1850,7 +1877,12 @@ bool runloop_environment_cb(unsigned cmd, void *data)
                core_option_manager_set_display(
                      runloop_st->core_options,
                      core_options_display->key,
+#ifdef HAVE_RETROARCH_LAB_TESTFLIGHT
+                     ra_lab_testflight_core_option(core_options_display->key)
+                     ? false : core_options_display->visible);
+#else
                      core_options_display->visible);
+#endif
             }
          }
          break;
@@ -3908,7 +3940,9 @@ bool runloop_environment_cb(unsigned cmd, void *data)
 
       case RETRO_ENVIRONMENT_GET_JIT_CAPABLE:
          {
-#if TARGET_OS_IPHONE
+#ifdef HAVE_RETROARCH_LAB_TESTFLIGHT
+            *(bool*)data             = false;
+#elif TARGET_OS_IPHONE
             /* iOS 26 changed how w/x memory can be acquired, and this API isn't helpful anymore */
             if (__builtin_available(iOS 26, tvOS 26, *))
                *(bool*)data          = false;
@@ -3926,7 +3960,11 @@ bool runloop_environment_cb(unsigned cmd, void *data)
                (struct retro_exec_mem_alloc *)data;
             if (!alloc || alloc->version < 1)
                return false;
-#if TARGET_OS_IPHONE
+#ifdef HAVE_RETROARCH_LAB_TESTFLIGHT
+            alloc->mode = RETRO_EXEC_MEM_MODE_UNAVAILABLE;
+            alloc->rx   = NULL;
+            alloc->rw   = NULL;
+#elif TARGET_OS_IPHONE
             if (!exec_mem_alloc(&alloc->size, &alloc->mode,
                                 &alloc->rx, &alloc->rw))
             {
@@ -3950,7 +3988,7 @@ bool runloop_environment_cb(unsigned cmd, void *data)
 
       case RETRO_ENVIRONMENT_EXEC_MEM_FREE:
          {
-#if TARGET_OS_IPHONE
+#if TARGET_OS_IPHONE && !defined(HAVE_RETROARCH_LAB_TESTFLIGHT)
             struct retro_exec_mem_free *f =
                (struct retro_exec_mem_free *)data;
             if (!f)
