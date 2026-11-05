@@ -19,9 +19,9 @@ SNES, 3DO and Saturn cores, plus Game Mode and the performance recorder.
 
 Build 10 is a reduced distribution variant, not the replacement for that full
 build. It reuses the same bundle ID and therefore must not be offered as the
-owner's update. The immediate distribution correction is to remove build 10
-from Owner validation. This removal is **pending**: the November 5 audit reached
-an App Store Connect sign-in screen and made no TestFlight changes.
+owner's update. On November 5, 2026, build 10 was removed from Owner validation
+with the owner's approval. App Store Connect confirmed the removal and displayed
+**Groups (0)** on the build page. The build was not expired or deleted.
 
 `archive_testflight.py` now refuses that full app identity before copying,
 removing components, or signing. Any separately requested reduced TestFlight
