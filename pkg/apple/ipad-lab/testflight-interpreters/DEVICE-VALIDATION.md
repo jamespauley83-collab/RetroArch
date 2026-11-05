@@ -30,7 +30,7 @@ attached debugger.
 - Runtime explicitly reported CPU Core: Interpreter and Fastmem enabled: No.
 - DSP HLE was enabled; DSP JIT and the fastmem arena were disabled.
 - Expected emulated RAM marker `0x52414c42` appeared.
-- The program counter variable advanced to 319,708,205 with 109 independently
+- The test program's RAM counter advanced to 319,708,205 with 109 independently
   observed changes.
 - 120 run calls completed; audio callbacks reported 63,552 frames.
 - Zero nonzero executable-memory requests; one zero-byte availability probe.
