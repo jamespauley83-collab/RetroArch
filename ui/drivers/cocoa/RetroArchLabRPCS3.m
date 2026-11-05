@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #import "RetroArchLabRPCS3.h"
 #import "RetroArchLabPerformance.h"
+#import "RetroArchLabGameMode.h"
 #import <QuartzCore/CAMetalLayer.h>
 #import <Metal/Metal.h>
 #import <GameController/GameController.h>
@@ -118,8 +119,11 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
    [super viewDidLoad];
    self.title = @"PlayStation 3";
 #ifdef HAVE_RETROARCH_LAB_LIBRARY
-   self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Performance"
-         style:UIBarButtonItemStylePlain target:self action:@selector(openPerformance)];
+   self.navigationItem.rightBarButtonItems = @[
+      [[UIBarButtonItem alloc] initWithTitle:@"Performance"
+            style:UIBarButtonItemStylePlain target:self action:@selector(openPerformance)],
+      [[UIBarButtonItem alloc] initWithTitle:@"Game Mode"
+            style:UIBarButtonItemStylePlain target:self action:@selector(openGameMode)]];
 #endif
    self.view.backgroundColor = UIColor.systemBackgroundColor;
    self.games = @[];
@@ -211,6 +215,7 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
 }
 #ifdef HAVE_RETROARCH_LAB_LIBRARY
 - (void)openPerformance { RALabPerfShow(self); }
+- (void)openGameMode { RALabGameModeShow(self); }
 #endif
 - (void)enableJIT
 {

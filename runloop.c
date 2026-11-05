@@ -1,5 +1,7 @@
 #ifdef HAVE_RETROARCH_LAB_LIBRARY
 #include "ui/drivers/cocoa/RetroArchLabPerformance.h"
+#include "ui/drivers/cocoa/RetroArchLabGameMode.h"
+#include "ui/drivers/cocoa/RetroArchLabLibrary.h"
 #endif
 /*  RetroArch - A frontend for libretro.
  *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
@@ -6214,6 +6216,20 @@ void runloop_msg_queue_push(
             accessibility_enable,
             accessibility_narrator_speech_speed,
             (char*) msg, 0);
+#endif
+#ifdef HAVE_RETROARCH_LAB_LIBRARY
+   if (     (category == MESSAGE_QUEUE_CATEGORY_INFO
+          || category == MESSAGE_QUEUE_CATEGORY_SUCCESS)
+         && prio <= 1
+         && (runloop_st->flags & RUNLOOP_FLAG_CORE_RUNNING)
+         && !(runloop_st->flags & (RUNLOOP_FLAG_PAUSED | RUNLOOP_FLAG_IDLE))
+         && runloop_st->current_core_type != CORE_TYPE_DUMMY
+#ifdef HAVE_MENU
+         && !(menu_state_get_ptr()->flags & MENU_ST_FLAG_ALIVE)
+#endif
+         && !cocoa_lab_library_visible()
+         && ra_lab_game_mode_quiet_enabled())
+      return;
 #endif
 #if defined(HAVE_GFX_WIDGETS)
    if (widgets_active)

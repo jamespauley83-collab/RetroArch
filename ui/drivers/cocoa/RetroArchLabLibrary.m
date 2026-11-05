@@ -4,6 +4,7 @@
 #import "apple_platform.h"
 #import "RetroArchLabLibrary.h"
 #import "RetroArchLabPerformance.h"
+#import "RetroArchLabGameMode.h"
 #ifdef HAVE_RETROARCH_LAB_RPCS3
 #import "RetroArchLabRPCS3.h"
 #endif
@@ -163,8 +164,15 @@ bool cocoa_lab_library_visible(void) { return ra_lab_library_visible; }
    [performance setTitle:@"Performance" forState:UIControlStateNormal];
    [performance.heightAnchor constraintGreaterThanOrEqualToConstant:44].active = YES;
    [performance addTarget:self action:@selector(openPerformance) forControlEvents:UIControlEventTouchUpInside];
+   UIButton *gameMode = [UIButton buttonWithType:UIButtonTypeSystem];
+   [gameMode setTitle:@"Game Mode" forState:UIControlStateNormal];
+   gameMode.accessibilityIdentifier = @"Lab Game Mode";
+   [gameMode.heightAnchor constraintGreaterThanOrEqualToConstant:44].active = YES;
+   [gameMode addTarget:self action:@selector(openGameMode) forControlEvents:UIControlEventTouchUpInside];
+   UIStackView *playTools = [[UIStackView alloc] initWithArrangedSubviews:@[performance, gameMode]];
+   playTools.distribution = UIStackViewDistributionFillEqually;
    UIStackView *filters = [[UIStackView alloc] initWithArrangedSubviews:
-         @[self.search, self.section, self.systemButton, self.statusLabel, performance]];
+         @[self.search, self.section, self.systemButton, self.statusLabel, playTools]];
    filters.axis = UILayoutConstraintAxisVertical;
    filters.spacing = 10;
    UICollectionViewFlowLayout *layout = [[UICollectionViewFlowLayout alloc] init];
@@ -358,6 +366,7 @@ bool cocoa_lab_library_visible(void) { return ra_lab_library_visible; }
    }];
 }
 - (void)openPerformance { RALabPerfShow(self); }
+- (void)openGameMode { RALabGameModeShow(self); }
 - (void)openAdvanced
 {
 #ifdef HAVE_RETROARCH_LAB_RPCS3
