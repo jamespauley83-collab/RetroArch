@@ -3,6 +3,7 @@
 #include <math.h>
 #import "apple_platform.h"
 #import "RetroArchLabLibrary.h"
+#import "RetroArchLabPerformance.h"
 #ifdef HAVE_RETROARCH_LAB_RPCS3
 #import "RetroArchLabRPCS3.h"
 #endif
@@ -158,8 +159,12 @@ bool cocoa_lab_library_visible(void) { return ra_lab_library_visible; }
    self.statusLabel.textColor = UIColor.secondaryLabelColor;
    self.statusLabel.text = @"Reading your existing playlists...";
    self.statusLabel.numberOfLines = 0;
+   UIButton *performance = [UIButton buttonWithType:UIButtonTypeSystem];
+   [performance setTitle:@"Performance" forState:UIControlStateNormal];
+   [performance.heightAnchor constraintGreaterThanOrEqualToConstant:44].active = YES;
+   [performance addTarget:self action:@selector(openPerformance) forControlEvents:UIControlEventTouchUpInside];
    UIStackView *filters = [[UIStackView alloc] initWithArrangedSubviews:
-         @[self.search, self.section, self.systemButton, self.statusLabel]];
+         @[self.search, self.section, self.systemButton, self.statusLabel, performance]];
    filters.axis = UILayoutConstraintAxisVertical;
    filters.spacing = 10;
    UICollectionViewFlowLayout *layout = [[UICollectionViewFlowLayout alloc] init];
@@ -197,6 +202,8 @@ bool cocoa_lab_library_visible(void) { return ra_lab_library_visible; }
 - (void)viewDidAppear:(BOOL)animated
 {
    [super viewDidAppear:animated];
+   ra_lab_perf_idle();
+   RALabPerfEvent(@"Library opened; emulation paused");
    command_event(CMD_EVENT_AUDIO_STOP, NULL);
    dispatch_async(dispatch_get_main_queue(), ^{ [self reloadLibrary]; });
 }
@@ -350,6 +357,7 @@ bool cocoa_lab_library_visible(void) { return ra_lab_library_visible; }
       if (completion) completion();
    }];
 }
+- (void)openPerformance { RALabPerfShow(self); }
 - (void)openAdvanced
 {
 #ifdef HAVE_RETROARCH_LAB_RPCS3
@@ -406,6 +414,7 @@ bool cocoa_lab_library_visible(void) { return ra_lab_library_visible; }
 }
 - (void)queuePath:(NSString *)path core:(NSString *)core
 {
+   RALabPerfEvent([NSString stringWithFormat:@"Load game: %@ · %@", path.lastPathComponent, core.lastPathComponent]);
    [self dismissLibrary:^{
       content_ctx_info_t info = {0};
       bool queued = task_push_load_content_with_new_core_from_companion_ui(

@@ -1,3 +1,6 @@
+#ifdef HAVE_RETROARCH_LAB_LIBRARY
+#include "../ui/drivers/cocoa/RetroArchLabPerformance.h"
+#endif
 /**
  *  RetroArch - A frontend for libretro.
  *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
@@ -2556,6 +2559,20 @@ static void audio_driver_extra_merge_s16(audio_driver_state_t *audio_st,
    }
 }
 
+#ifdef HAVE_RETROARCH_LAB_LIBRARY
+static ssize_t audio_driver_lab_write(const audio_driver_t *audio,
+      void *context, const void *data, size_t bytes)
+{
+   uint64_t start = ra_lab_perf_clock();
+   ssize_t written = audio->write(context, data, bytes);
+   ra_lab_perf_stage(start, 1);
+   return written;
+}
+#else
+#define audio_driver_lab_write(audio, context, data, bytes) \
+   (audio)->write(context, data, bytes)
+#endif
+
 /* A non-blocking write the ring cannot take is cut short. The discard
  * path means to lose that; the pitch-preserving stream is continuous, and
  * its first output after a press meets the ring the 1x blocking writes
@@ -2564,7 +2581,7 @@ static ssize_t audio_driver_dev_write(audio_driver_state_t *audio_st,
       const audio_driver_t *audio, const void *buf, size_t bytes,
       bool wait_room)
 {
-   ssize_t w = audio->write(audio_st->context_audio_data, buf, bytes);
+   ssize_t w = audio_driver_lab_write(audio, audio_st->context_audio_data, buf, bytes);
    if (     wait_room
          && w >= 0 && (size_t)w < bytes
          && (AUDIO_FLAGS_GET(audio_st) & AUDIO_FLAG_NONBLOCK)
@@ -2576,7 +2593,7 @@ static ssize_t audio_driver_dev_write(audio_driver_state_t *audio_st,
    {
       ssize_t rest;
       audio->set_nonblock_state(audio_st->context_audio_data, false);
-      rest = audio->write(audio_st->context_audio_data,
+      rest = audio_driver_lab_write(audio, audio_st->context_audio_data,
             (const uint8_t*)buf + w, bytes - (size_t)w);
       audio->set_nonblock_state(audio_st->context_audio_data,
             (AUDIO_FLAGS_GET(audio_st) & AUDIO_FLAG_NONBLOCK) != 0);
@@ -2942,7 +2959,7 @@ static void audio_driver_resume_topup(audio_driver_state_t *audio_st)
    while (room > 0)
    {
       size_t n = (room < sizeof(zeros)) ? room : sizeof(zeros);
-      if (audio->write(audio_st->context_audio_data, zeros, n) <= 0)
+      if (audio_driver_lab_write(audio, audio_st->context_audio_data, zeros, n) <= 0)
          break;
       room -= n;
    }
@@ -5685,7 +5702,7 @@ static void audio_driver_pipeline_retry(audio_driver_state_t *audio_st)
       if (!ready) return;
       if (bytes > ready) bytes = ready;
       audio_driver_state_lock();
-      written = audio->write(audio_st->context_audio_data, audio_st->pipe_pending, bytes);
+      written = audio_driver_lab_write(audio, audio_st->context_audio_data, audio_st->pipe_pending, bytes);
       if (written > 0 && (size_t)written <= bytes)
       {
          size_t fb = audio_driver_dev_frame_bytes(audio_st);

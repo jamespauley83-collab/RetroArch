@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #import "RetroArchLabRPCS3.h"
+#import "RetroArchLabPerformance.h"
 #import <QuartzCore/CAMetalLayer.h>
 #import <Metal/Metal.h>
 #import <GameController/GameController.h>
@@ -13,6 +14,7 @@
 
 static RALabPS3API ra_ps3_api;
 static void *ra_ps3_handle;
+static __typeof__(&rpcs3_ios_get_performance_metrics) ra_ps3_metrics;
 static BOOL ra_ps3_ready;
 static BOOL ra_ps3_failed;
 static dispatch_queue_t ra_ps3_queue;
@@ -71,6 +73,7 @@ static void RALabPS3Log(void *context, int32_t level, const char *message)
 @property(nonatomic, strong) UIButton *stopButton;
 @property(nonatomic, copy) NSArray *games;
 @property(nonatomic, copy) NSString *importKind;
+@property(nonatomic, assign) CFTimeInterval lastMetricsTime;
 @property(nonatomic, assign) BOOL busy;
 @property(nonatomic, assign) BOOL booting;
 @property(nonatomic, assign) NSUInteger bootGeneration;
@@ -114,6 +117,10 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
 {
    [super viewDidLoad];
    self.title = @"PlayStation 3";
+#ifdef HAVE_RETROARCH_LAB_LIBRARY
+   self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"Performance"
+         style:UIBarButtonItemStylePlain target:self action:@selector(openPerformance)];
+#endif
    self.view.backgroundColor = UIColor.systemBackgroundColor;
    self.games = @[];
    self.controllers = @[];
@@ -121,7 +128,7 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
    self.status.numberOfLines = 0;
    self.status.font = [UIFont preferredFontForTextStyle:UIFontTextStyleSubheadline];
    self.status.accessibilityIdentifier = @"PS3 status";
-   self.status.text = @"XITRIX 0.12 bridge. Enable PS3 JIT to relaunch this test app through StikDebug. Then open PS3 and tap Start PS3. Import firmware and games into this app's separate library.";
+   self.status.text = @"XITRIX 0.12 bridge. Enable PS3 JIT to attach StikDebug to this app. Then open PS3 and tap Start PS3. Import firmware and games into this app's separate library.";
    self.jitButton = [self button:@"Enable PS3 JIT" action:@selector(enableJIT)];
    self.startButton = [self button:@"Start PS3" action:@selector(startCore)];
    self.importButton = [self button:@"Import" action:@selector(importMenu)];
@@ -202,15 +209,20 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
    self.navigationItem.hidesBackButton = self.busy || self.playing;
    self.navigationController.modalInPresentation = self.busy || self.playing;
 }
+#ifdef HAVE_RETROARCH_LAB_LIBRARY
+- (void)openPerformance { RALabPerfShow(self); }
+#endif
 - (void)enableJIT
 {
+   RALabPerfEvent(@"PS3: requesting StikDebug attachment to current process");
    NSURLComponents *url = [[NSURLComponents alloc] init];
    url.scheme = @"stikdebug"; url.host = @"enable-jit";
-   /* StikDebug must launch the process before attaching on this device. */
+   /* Attach to this process so its startup recording survives the handoff. */
    url.queryItems = @[[NSURLQueryItem queryItemWithName:@"bundle-id" value:NSBundle.mainBundle.bundleIdentifier],
+         [NSURLQueryItem queryItemWithName:@"pid" value:[NSString stringWithFormat:@"%d", getpid()]],
          [NSURLQueryItem queryItemWithName:@"script-name" value:@"universal.js"]];
    [UIApplication.sharedApplication openURL:url.URL options:@{} completionHandler:^(BOOL opened) {
-      self.status.text = opened ? @"Let StikDebug relaunch this test app with Universal, then open PS3 and tap Start PS3."
+      self.status.text = opened ? @"Let StikDebug attach Universal, return to this app, and tap Start PS3."
             : @"Open StikDebug, assign universal.js to this PS3 test app, and launch it there.";
    }];
 }
@@ -228,10 +240,12 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
    dispatch_async(ra_ps3_queue, ^{
       NSString *failure = nil;
       BOOL ready = NO;
+      RALabPerfEvent(@"PS3: JIT probe begin");
       if (!RALabPS3JITAttached())
-         failure = @"Universal JIT is not attached. Use Enable PS3 JIT, return here, and try again. Lab's PS2 JIT pool does not prepare the PS3 core.";
+         failure = @"The Universal JIT handshake did not complete. The script may already be assigned; assignment alone does not confirm an active connection. Use Enable PS3 JIT and check StikDebug for connection or script errors.";
       else
       {
+         RALabPerfEvent(@"PS3: JIT probe passed; loading core");
          NSString *path = [NSBundle.mainBundle.privateFrameworksPath stringByAppendingPathComponent:@"libRPCS3Core.dylib"];
          ra_ps3_handle = dlopen(path.fileSystemRepresentation, RTLD_NOW | RTLD_LOCAL);
          if (!ra_ps3_handle) failure = RALabPS3String(dlerror());
@@ -242,6 +256,7 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
                failure = [@"Unsupported PS3 core: " stringByAppendingString:RALabPS3String(missing)];
             else
             {
+               ra_ps3_metrics = (__typeof__(ra_ps3_metrics))dlsym(ra_ps3_handle, "rpcs3_ios_get_performance_metrics");
                NSFileManager *files = NSFileManager.defaultManager;
                NSURL *documents = [files URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask].firstObject;
                NSURL *root = [documents URLByAppendingPathComponent:@"PS3/Data" isDirectory:YES];
@@ -260,7 +275,9 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
                   config.application_support_path = rootPath.fileSystemRepresentation;
                   config.cache_path = cachePath.fileSystemRepresentation;
                   config.main_thread_callback = RALabPS3Main; config.log_callback = RALabPS3Log;
+                  RALabPerfEvent(@"PS3: initialize begin");
                   int status = ra_ps3_api.initialize(&config);
+                  RALabPerfEvent(@"PS3: initialize returned; LLVM self-test begin");
                   uint64_t result = 0;
                   if (!status) status = ra_ps3_api.run_llvm_self_test(5, &result);
                   if (status) failure = RALabPS3Error(status);
@@ -270,6 +287,7 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
             }
          }
       }
+      RALabPerfEvent(ready ? @"PS3: ready" : [@"PS3 startup failed: " stringByAppendingString:failure ?: @"unknown"]);
       exec_mem_end_builtin_jit();
       dispatch_async(dispatch_get_main_queue(), ^{
          ra_ps3_ready = ready;
@@ -313,6 +331,7 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
    if (self.busy || self.playing || !ra_ps3_ready || self.backgrounded) return;
    if (self.audioInterruption || ![self activateAudio]) return;
    NSString *titleID = self.games[path.row][@"id"];
+   RALabPerfEvent([@"PS3: boot game " stringByAppendingString:titleID]);
    self.playing = YES; self.busy = YES; self.booting = YES;
    self.pauseRequested = NO;
    NSUInteger generation = ++self.bootGeneration;
@@ -323,6 +342,7 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
    [self.displayLink addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
    dispatch_async(ra_ps3_queue, ^{
       int status = ra_ps3_api.boot_game(titleID.UTF8String, NULL);
+      RALabPerfEvent([NSString stringWithFormat:@"PS3: boot call returned %d", status]);
       NSString *message = status ? RALabPS3Error(status) : @"Starting game. First-time shader compilation may take a few minutes…";
       dispatch_async(dispatch_get_main_queue(), ^{
          if (generation != self.bootGeneration || self.stopping) return;
@@ -398,6 +418,20 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
 }
 - (void)tick
 {
+#ifdef HAVE_RETROARCH_LAB_LIBRARY
+   CFTimeInterval now = CACurrentMediaTime();
+   if (ra_lab_perf_clock() && now - self.lastMetricsTime >= 1)
+   {
+      self.lastMetricsTime = now;
+      rpcs3_ios_performance_metrics metrics = {0};
+      metrics.struct_size = sizeof(metrics);
+      if (ra_ps3_metrics && ra_ps3_metrics(&metrics) != 0) metrics.valid_fields = 0;
+      NSString *state = self.backgrounded ? @"PS3 background" :
+            (self.booting ? @"PS3 booting" : (self.pauseRequested || self.pausePending ||
+            [self.pauseButton.currentTitle isEqualToString:@"Resume"] ? @"PS3 paused" : @"PS3 playing"));
+      RALabPerfPS3(state, metrics.valid_fields, metrics.frames_per_second, metrics.gpu_usage_percent);
+   }
+#endif
    if (!self.playing || self.backgrounded || self.audioInterruption || self.stopping ||
          self.pausePending || self.pauseRequested || [self.pauseButton.currentTitle isEqualToString:@"Resume"]) return;
    for (unsigned index = 0; index < 7; index++)

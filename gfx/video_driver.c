@@ -1,3 +1,6 @@
+#ifdef HAVE_RETROARCH_LAB_LIBRARY
+#include "../ui/drivers/cocoa/RetroArchLabPerformance.h"
+#endif
 /*  RetroArch - A frontend for libretro.
  *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  *  Copyright (C) 2011-2021 - Daniel De Matteis
@@ -7342,6 +7345,9 @@ void video_driver_frame(const void *data, unsigned width,
     * the next frame after drivers_init() presents normally. */
    if (render_frame && vid && vid->frame && video_st->data)
    {
+#ifdef HAVE_RETROARCH_LAB_LIBRARY
+      uint64_t lab_submit_start = ra_lab_perf_clock();
+#endif
       video_info.current_subframe = 0;
 #ifdef HAVE_THREADS
       /* The video thread owns and stamps this under the wrapper. */
@@ -7377,6 +7383,9 @@ void video_driver_frame(const void *data, unsigned width,
 #endif
          video_st->swap_count += video_driver_presents_per_frame(&video_info);
 
+#ifdef HAVE_RETROARCH_LAB_LIBRARY
+      ra_lab_perf_stage(lab_submit_start, 0);
+#endif
       /* A frame has gone out, so fonts retired while it was being
        * built are one frame closer to being safe to release. Inside
        * this block rather than after it: render_frame is false when

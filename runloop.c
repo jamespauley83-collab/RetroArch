@@ -1,3 +1,6 @@
+#ifdef HAVE_RETROARCH_LAB_LIBRARY
+#include "ui/drivers/cocoa/RetroArchLabPerformance.h"
+#endif
 /*  RetroArch - A frontend for libretro.
  *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
  *  Copyright (C) 2011-2021 - Daniel De Matteis
@@ -8282,6 +8285,10 @@ int runloop_iterate(void)
    discord_state_t *discord_st            = discord_state_get_ptr();
 #endif
 
+#ifdef HAVE_RETROARCH_LAB_LIBRARY
+   if (core_paused || runloop_st->current_core_type == CORE_TYPE_DUMMY)
+      ra_lab_perf_idle();
+#endif
    runloop_msg_queue_drain_deferred();
 
    /* A video driver that lost its GPU device - a TDR on Windows, a GPU
@@ -8566,6 +8573,16 @@ int runloop_iterate(void)
             camera_st->cb.frame_raw_framebuffer,
             camera_st->cb.frame_opengl_texture);
 
+#ifdef HAVE_RETROARCH_LAB_LIBRARY
+   if (runloop_st->current_core_type != CORE_TYPE_DUMMY)
+      ra_lab_perf_begin(runloop_st->current_library_name,
+            path_basename_nocompression(path_get(RARCH_PATH_BASENAME)),
+            video_st->av_info.timing.fps,
+            (runloop_st->flags & RUNLOOP_FLAG_FASTMOTION) ? 1 :
+            ((runloop_st->flags & RUNLOOP_FLAG_SLOWMOTION) ? 2 : 0),
+            video_driver_get_ident(), audio_driver_get_ident(),
+            video_st->thread_wrapper_active);
+#endif
    /* Measure the time between core_run() and video_driver_frame() */
    runloop_st->core_run_time = cpu_features_get_time_usec();
 
@@ -8596,6 +8613,12 @@ int runloop_iterate(void)
          core_run();
    }
 
+#ifdef HAVE_RETROARCH_LAB_LIBRARY
+   ra_lab_perf_end();
+   if (ra_lab_perf_clock())
+      ra_lab_perf_audio(audio_driver_get_underruns(),
+            audio_st->current_audio && audio_st->current_audio->underruns && audio_st->context_audio_data);
+#endif
    /* Increment runtime tick counter after each call to
     * core_run() or run_ahead() */
    runloop_st->core_runtime_usec += runloop_core_runtime_tick(
