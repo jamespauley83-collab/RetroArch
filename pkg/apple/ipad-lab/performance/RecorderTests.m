@@ -2,8 +2,71 @@
 #import <XCTest/XCTest.h>
 #define HAVE_RETROARCH_LAB_LIBRARY 1
 #import "../../../../ui/drivers/cocoa/RetroArchLabPerformance.m"
+#import "../../../../ui/drivers/cocoa/RetroArchLabGameMode.m"
 
 @interface PerformanceRecorderTests : XCTestCase
+@end
+
+@interface GameModeTests : XCTestCase
+@property(nonatomic, strong) id savedQuietPreference;
+@end
+@implementation GameModeTests
+- (void)setUp
+{
+   [super setUp];
+   self.savedQuietPreference = [NSUserDefaults.standardUserDefaults objectForKey:RALabQuietGameplayKey];
+}
+- (void)tearDown
+{
+   if (self.savedQuietPreference)
+      [NSUserDefaults.standardUserDefaults setObject:self.savedQuietPreference forKey:RALabQuietGameplayKey];
+   else
+      [NSUserDefaults.standardUserDefaults removeObjectForKey:RALabQuietGameplayKey];
+   __atomic_store_n(&ra_lab_quiet_gameplay, RALabGameModeReadPreference(), __ATOMIC_RELAXED);
+   [super tearDown];
+}
+- (void)testDefaultAndStoredChoices
+{
+   [NSUserDefaults.standardUserDefaults removeObjectForKey:RALabQuietGameplayKey];
+   XCTAssertTrue(RALabGameModeReadPreference());
+   [NSUserDefaults.standardUserDefaults setBool:NO forKey:RALabQuietGameplayKey];
+   XCTAssertFalse(RALabGameModeReadPreference());
+   [NSUserDefaults.standardUserDefaults setBool:YES forKey:RALabQuietGameplayKey];
+   XCTAssertTrue(RALabGameModeReadPreference());
+}
+- (void)testSwitchPersistsAndDoesNotStartRecorder
+{
+   void (^check)(void) = ^{
+      XCTAssertEqual(ra_lab_perf_clock(), 0);
+      RALabGameModeController *page = [[RALabGameModeController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+      [page loadViewIfNeeded];
+      UITableViewCell *cell = [page tableView:page.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]];
+      UISwitch *toggle = (UISwitch *)cell.accessoryView;
+      XCTAssertEqualObjects(toggle.accessibilityIdentifier, @"Lab quiet gameplay");
+      toggle.on = NO;
+      [toggle sendActionsForControlEvents:UIControlEventValueChanged];
+      XCTAssertFalse(ra_lab_game_mode_quiet_enabled());
+      XCTAssertFalse(RALabGameModeReadPreference());
+      toggle.on = YES;
+      [toggle sendActionsForControlEvents:UIControlEventValueChanged];
+      XCTAssertTrue(ra_lab_game_mode_quiet_enabled());
+      XCTAssertTrue(RALabGameModeReadPreference());
+      XCTAssertEqual(ra_lab_perf_clock(), 0);
+   };
+   if (NSThread.isMainThread) check(); else dispatch_sync(dispatch_get_main_queue(), check);
+}
+- (void)testGuidanceDoesNotClaimSystemFocusControl
+{
+   void (^check)(void) = ^{
+      RALabGameModeController *page = [[RALabGameModeController alloc] initWithStyle:UITableViewStyleInsetGrouped];
+      [page loadViewIfNeeded];
+      XCTAssertEqual([page numberOfSectionsInTableView:page.tableView], 3);
+      XCTAssertEqual([page tableView:page.tableView numberOfRowsInSection:2], 3);
+      XCTAssertTrue([[page tableView:page.tableView titleForFooterInSection:2] containsString:@"cannot turn it on"]);
+      XCTAssertTrue([[page tableView:page.tableView titleForFooterInSection:1] containsString:@"cannot force it on"]);
+   };
+   if (NSThread.isMainThread) check(); else dispatch_sync(dispatch_get_main_queue(), check);
+}
 @end
 @implementation PerformanceRecorderTests
 - (void)onMain:(dispatch_block_t)block

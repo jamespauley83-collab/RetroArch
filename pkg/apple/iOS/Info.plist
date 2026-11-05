@@ -84,6 +84,8 @@
 	<true/>
 	<key>GCSupportsGameMode</key>
 	<true/>
+	<key>LSSupportsGameMode</key>
+	<true/>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSApplicationCategoryType</key>
