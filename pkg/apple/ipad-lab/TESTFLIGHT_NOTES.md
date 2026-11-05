@@ -8,7 +8,36 @@ For each upload, save build-specific notes in App Store Connect's **What to Test
 field and reopen the build to verify them before making it available to testers.
 App-level Test Information and pull request notes do not replace that field.
 
-## Published notes: 1.22.2 (10)
+## Correct build reference — November 5, 2026
+
+The owner identified the installed iPad app as the intended full RetroArch Lab
+build. A fresh device inventory confirmed version 1.22.2 (8), development signed,
+with the bundle ID above. Its installation path matched the build-8 install
+receipt. The corresponding signed package includes ARMSX2 and Play! (PS2),
+Dolphin (GameCube/Wii), the native RPCS3 bridge (PS3), and the existing NES,
+SNES, 3DO and Saturn cores, plus Game Mode and the performance recorder.
+
+Build 10 is a reduced distribution variant, not the replacement for that full
+build. It reuses the same bundle ID and therefore must not be offered as the
+owner's update. The immediate distribution correction is to remove build 10
+from Owner validation. This removal is **pending**: the November 5 audit reached
+an App Store Connect sign-in screen and made no TestFlight changes.
+
+`archive_testflight.py` now refuses that full app identity before copying,
+removing components, or signing. Any separately requested reduced TestFlight
+variant requires its own provisioned base app and a different bundle ID. Do not
+change the full app's identity or replace its installed package to work around
+this check.
+
+The signed build-8 reference was preserved on the build Mac with all 167 file
+hashes matching the original installation artifact and deep signature
+verification passing. Source tree: `06f85bcca841c84b2dc34a57bf49af84f2e5e415`.
+Signed executable SHA-256:
+`345c217e15be13dedf3100784114a1130c7af4ac3846a262d3ff1de212c64666`.
+The device installation and its user data were not modified during this audit.
+No new app build or hosted CI run was requested.
+
+## Historical published notes: 1.22.2 (10)
 
 Apple completed processing build 10 on November 5, 2026 (UTC), and marked it
 Ready to Test. The following English (U.S.) notes were saved in What to Test,
