@@ -44,6 +44,7 @@
 #include "../ui/drivers/cocoa/RetroArchLabJIT.m"
 #endif
 #include "../ui/drivers/cocoa/RetroArchLabLibrary.m"
+#include "../ui/drivers/cocoa/RetroArchLabPerformance.m"
 #ifdef HAVE_RETROARCH_LAB_RPCS3
 #include "../ui/drivers/cocoa/RetroArchLabRPCS3.m"
 #endif
