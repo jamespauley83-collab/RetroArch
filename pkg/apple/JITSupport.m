@@ -13,6 +13,31 @@
 
 #import "JITSupport.h"
 
+#ifdef HAVE_RETROARCH_LAB_TESTFLIGHT
+#include <libretro.h>
+
+/* Distribution never starts a debugger service or requests executable memory. */
+bool jit_available(void) { return false; }
+bool jit_possible(void) { return false; }
+#if !TARGET_OS_TV
+bool jb_enable_ptrace_hack(void) { return false; }
+#endif
+bool exec_mem_pool_init(void) { return false; }
+void exec_mem_pool_reset(void) { }
+bool exec_mem_alloc(size_t *size, unsigned *mode, void **rx, void **rw)
+{
+   (void)size;
+   if (mode) *mode = RETRO_EXEC_MEM_MODE_UNAVAILABLE;
+   if (rx) *rx = NULL;
+   if (rw) *rw = NULL;
+   return false;
+}
+void exec_mem_free(void *rx, void *rw, size_t size, bool dual)
+{
+   (void)rx; (void)rw; (void)size; (void)dual;
+}
+#else
+
 #include <dlfcn.h>
 #include <mach/mach.h>
 #include <mach-o/dyld.h>
@@ -942,3 +967,5 @@ bool jit_available(void)
    return true;
 #endif
 }
+
+#endif /* HAVE_RETROARCH_LAB_TESTFLIGHT */

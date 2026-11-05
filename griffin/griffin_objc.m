@@ -40,8 +40,8 @@
 #include "../ui/drivers/cocoa/RetroArchPlaylistManager.m"
 #endif
 #if defined(HAVE_RETROARCH_LAB_LIBRARY) && TARGET_OS_IOS
-#if defined(HAVE_RETROARCH_LAB_TESTFLIGHT) && (defined(HAVE_RETROARCH_LAB_STIKJIT) || defined(HAVE_RETROARCH_LAB_RPCS3))
-#error TestFlight builds must exclude development-only JIT and PS3 integration
+#if defined(HAVE_RETROARCH_LAB_TESTFLIGHT) && defined(HAVE_RETROARCH_LAB_STIKJIT)
+#error TestFlight builds must exclude development-only debugger activation
 #endif
 #ifdef HAVE_RETROARCH_LAB_STIKJIT
 #include "../ui/drivers/cocoa/RetroArchLabJIT.m"

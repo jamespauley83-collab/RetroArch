@@ -1,7 +1,6 @@
 #include "Lab.xcconfig"
 
-// Debugger activation and the native PS3 bridge are development-only.
+// Distribution uses native interpreters; debugger activation is not compiled.
 LAB_JIT_FLAGS =
-LAB_RPCS3_FLAGS =
+LAB_RPCS3_FLAGS = -DHAVE_RETROARCH_LAB_RPCS3
 OTHER_CFLAGS = $(inherited) -DHAVE_APPLE_STORE -DHAVE_RETROARCH_LAB_TESTFLIGHT
-
