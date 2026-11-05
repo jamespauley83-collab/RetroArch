@@ -17,8 +17,8 @@ app. The app claimed no debugger entitlement and no debugger was attached.
 - The captured frame was visually checked and showed the actual PS2 BIOS
   startup animation.
 
-Scope: BIOS startup, rendering and audio. Commercial-game compatibility and
-performance were not established. QA memory cards and BIOS NVRAM stayed in the
+Scope: BIOS startup, rendering and audio callbacks. Commercial-game
+compatibility and performance were not established. QA memory cards and BIOS NVRAM stayed in the
 separate QA container.
 
 ## Dolphin interpreter
@@ -73,5 +73,12 @@ The host and packaged core binaries passed the checked private API/import
 audits. The archive passed deep strict code-signature verification and includes
 all required frameworks.
 
-App Store export/upload is still pending Xcode Apple Account sign-in. No
-TestFlight delivery success is claimed in this validation record.
+Distribution delivery was verified separately on November 5, 2026: the
+preserved build-11 archive was exported, uploaded, and processed successfully.
+Its What to Test notes were saved and reopened, and its Owner validation
+assignment was confirmed. [App Store Connect build 11](https://appstoreconnect.apple.com/teams/624c8dce-c9b4-4f3d-9765-088e197cdb71/apps/6830930218/testflight/ios/ad2ea1d3-5278-459e-b434-11502ef98962)
+
+The physical-device tests above preceded distribution export and used local
+acceptance signatures. They were not repeated on a TestFlight-installed app.
+The stated limits on firmware import, hardware graphics, commercial-game
+compatibility and performance remain unchanged.

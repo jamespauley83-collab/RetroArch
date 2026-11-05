@@ -87,12 +87,15 @@ scope.
 Build 11 is built, signed for local device acceptance, and installed on the
 iPhone. The preserved iPad build 8 was not changed.
 
-**TestFlight delivery is pending Xcode Apple Account authentication.** Automatic
-App Store export currently reports a missing Xcode account credential and
-`No Accounts`. The existing signed-in App Store Connect web session is valid;
-it does not replace Xcode's signing authentication. No certificate was revoked,
-credential fabricated, or signing restriction bypassed.
+**RetroArch Lab 1.22.2 (11) is available in TestFlight under Owner validation.**
 
-After the normal Xcode account sign-in is restored, export and verify the same
-archive, upload it, save and reopen the build-specific What to Test notes, then
-assign build 11 to Owner validation. Build 10 remains withdrawn from that group.
+The preserved archive was exported successfully on November 5, 2026, uploaded,
+and processed by App Store Connect. The build-specific What to Test notes were
+saved and reopened, and its Owner validation assignment was verified.
+Build 10 remains withdrawn from that group.
+
+[App Store Connect build 11](https://appstoreconnect.apple.com/teams/624c8dce-c9b4-4f3d-9765-088e197cdb71/apps/6830930218/testflight/ios/ad2ea1d3-5278-459e-b434-11502ef98962)
+
+The documented physical-device checks used local acceptance signatures before
+distribution export. They were not tests of a TestFlight-installed app;
+their compatibility and performance limits remain unchanged.
