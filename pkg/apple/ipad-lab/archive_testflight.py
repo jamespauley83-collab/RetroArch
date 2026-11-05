@@ -56,7 +56,6 @@ def main():
     info['CFBundleVersion'] = str(args.build)
     info_path.write_bytes(plistlib.dumps(info))
     support = args.archive / 'SwiftSupport/iphoneos'
-    support.mkdir(parents=True)
     subprocess.run(['xcrun', 'swift-stdlib-tool', '--copy',
                     '--scan-executable', str(app / 'RetroArch'),
                     '--scan-folder', str(frameworks), '--platform', 'iphoneos',
@@ -65,6 +64,10 @@ def main():
     for library in frameworks.glob('*.dylib'):
         if not library.name.startswith('libswift') or not (support / library.name).exists():
             raise RuntimeError('Unsupported standalone library: ' + str(library))
+    # Modern iOS may need no bundled Swift runtime. An empty SwiftSupport
+    # directory is rejected by App Store Connect (ITMS-90424).
+    if support.parent.exists() and not any(p.is_file() for p in support.parent.rglob('*')):
+        shutil.rmtree(support.parent)
     entitlements = subprocess.check_output(
         ['codesign', '-d', '--entitlements', ':-', str(args.base_app)], stderr=subprocess.DEVNULL)
     entitlements_path = args.archive / 'SigningEntitlements.plist'
@@ -86,7 +89,7 @@ def main():
     (args.archive / 'Info.plist').write_bytes(plistlib.dumps(metadata))
     print(json.dumps({'archive': str(args.archive), 'build': info['CFBundleVersion'],
                       'frameworks': sorted(expected),
-                      'swift_support': [p.name for p in support.iterdir()],
+                      'swift_support': [p.name for p in support.iterdir()] if support.exists() else [],
                       'signed_host_sha256': hashlib.sha256((app / 'RetroArch').read_bytes()).hexdigest()}))
 
 
