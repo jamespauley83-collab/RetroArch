@@ -20,6 +20,10 @@ def main():
     args = parser.parse_args()
     if args.archive.exists():
         parser.error('Archive already exists; choose a new output path.')
+    base_info = plistlib.loads((args.base_app / 'Info.plist').read_bytes())
+    if base_info.get('CFBundleIdentifier') == 'com.jamespauley.retroarchlab.ps3bridge':
+        parser.error('Reduced TestFlight builds must not replace the full RetroArch Lab app. '
+                     'Use a separately provisioned base app with a different bundle ID.')
     symbols = subprocess.check_output(['nm', '-g', str(args.host)], text=True)
     forbidden = ['SecTaskCreateFromSelf', 'SecTaskCopyValueForEntitlement',
                  'OBJC_CLASS_$_RALabJIT', 'OBJC_CLASS_$_RALabPS3Controller']
