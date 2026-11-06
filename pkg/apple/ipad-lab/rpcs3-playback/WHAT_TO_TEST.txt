@@ -1,0 +1,12 @@
+RetroArch Lab 1.22.2 (13) — PS3 playback investigation
+
+This candidate includes corrections for false microphone attachment reports and growing native log storage, plus the updated performance HUD and PS3 log console. PS3 still uses the interpreter backend. Faster gameplay and smoother audio have not yet been confirmed on a physical device.
+
+What to test
+
+1. Use the same PS3 game, save/scene and graphics/audio settings as your previous recording. For the reported slowdown, repeat the same section of 50 Cent: Blood on the Sand.
+2. Start a performance recording, then play that section for two minutes. Tap the recording badge when audio or video slows. Note whether the audio slows, crackles or cuts out, and which scene causes it.
+3. Stop the recording and export the performance JSONL from Performance > Share a report. Then open Log on the PS3 screen and choose Export. Send both files from the same session before closing the app; the native log is kept in a bounded memory buffer and resets when the app exits.
+4. After the timed section, check controller input, pause/resume and normal in-game saving. Save in the game before using Stop.
+
+Please report whether the slowdown improves, stays the same or gets worse. Compare the same scene rather than expecting every scene to run at 60 FPS. The performance JSONL does not measure native PS3 audio underruns; the separate PS3 log helps distinguish audio production from output problems.

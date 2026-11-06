@@ -1,0 +1,109 @@
+{
+  "schema": 1,
+  "version": "1.22.2",
+  "candidate_build": 13,
+  "status": "build13_uploaded_and_development_installed",
+  "host_base_commit": "e433deb7216e3761200460557f44a126ddd6a82d",
+  "native_source": {
+    "repository": "https://github.com/XITRIX/rpcs3",
+    "commit": "f88bff947b83730c0cf8a3949f59338b992b3ca0",
+    "abi": 30,
+    "patch_order": [
+      "../testflight-interpreters/rpcs3-interpreter-only.patch",
+      "native-core.patch"
+    ],
+    "playback_patch_sha256": "53a103b59d15d36e9349ad2d3f18214fc10cd0e2a95f83d664e513e27db15561",
+    "jit": false,
+    "llvm": false
+  },
+  "microphone_source": {
+    "url": "https://github.com/emelin2004/rpcs3-xbox/pull/43",
+    "author": "emelin2004",
+    "head_commit": "9fbb7355e6a17a2d3993f6333a6b52749c6bb015"
+  },
+  "build": {
+    "platform": "iOS arm64",
+    "sdk": "27.2",
+    "minimum_os": "16.0",
+    "configuration": "Release",
+    "native_translation_units_recompiled": 2,
+    "unchanged_emulator_archive_members": 520
+  },
+  "pre_signing_artifacts": {
+    "native_core": {
+      "bytes": 48549944,
+      "sha256": "9d1c5feceae24bbd4f3a870916002972fb62f5a86b818583b0fc49d8942a5167"
+    },
+    "native_logger_object": {
+      "bytes": 1007096,
+      "sha256": "b6e5784b780e3dce81999a1692bb83bd5a1a9def333f73b1971516badc63a296"
+    },
+    "microphone_object": {
+      "bytes": 131584,
+      "sha256": "b384a32d26657b6d0e1829e37ca0871027f5cb64b0b65f6765ff692e16a3a439"
+    },
+    "host": {
+      "bytes": 16882544,
+      "sha256": "d5142c26239266c58de8f9c1ac55a74f9147537eb076f3aea0ddd14d7a838f5b"
+    }
+  },
+  "acceptance": {
+    "native_focused_regressions": "passed",
+    "native_compile_and_link": "passed",
+    "physical_gameplay": "not_launched",
+    "device_installation": "confirmed_build13_development_in_place",
+    "testflight_distribution": "availability_unverified",
+    "measured_fps_gain": null,
+    "host_focused_tests": {
+      "passed": 12,
+      "failed": 0,
+      "environment": "iPhone 17 / iOS 27.2 Simulator"
+    },
+    "signed_archive": "completed_for_build13",
+    "app_store_connect_export": "completed_for_build13",
+    "upload": "succeeded_for_build13",
+    "testflight_processing": "reported_at_upload_completion",
+    "testflight_what_to_test": "saved_locally_publication_unverified"
+  },
+  "superseded_build12_export": {
+    "method": "app-store-connect",
+    "version": "1.22.2",
+    "build": "12",
+    "bytes": 55109228,
+    "sha256": "cf3fb8fbe8dcb03aa5fc4f9d9b9124c6bfc239cbbe7c6f4b50722432ca50c3be",
+    "status": "upload_rejected_build_number_already_used"
+  },
+  "distribution_export": {
+    "method": "app-store-connect",
+    "version": "1.22.2",
+    "build": "13",
+    "status": "exported_and_uploaded",
+    "bytes": 55109223,
+    "sha256": "b45b8a7142f8dc686178a11ea53fc28691cb441db939a17f7e64f1016ed3bbf0"
+  },
+  "archive": {
+    "version": "1.22.2",
+    "build": "13",
+    "status": "completed",
+    "signed_host_sha256": "092d710e81d927bbadfb2d589fff9495e63bd9a2229089c144699fc8eca76e4a",
+    "normalized_framework_unsigned_sha256": "8439b835305aa710cd25be5941b2969ed00068cbef41bc89527d125af979bccd",
+    "normalization": "Framework install name adjusted and prior signature removed before archive signing; pre-signing native_core identifies the linked input."
+  },
+  "development_installation": {
+    "status": "confirmed",
+    "version": "1.22.2",
+    "build": "13",
+    "in_place": true,
+    "gameplay_launched": false
+  },
+  "data_preservation": {
+    "documents_inventory_entries": 6126,
+    "documents_missing": 0,
+    "documents_size_changes": 0,
+    "backed_up_save_configuration_files": 43,
+    "save_configuration_sha256_matches": 43,
+    "other_apps_added": 0,
+    "other_apps_removed": 0,
+    "only_installed_version_change": "RetroArch Lab"
+  }
+}
