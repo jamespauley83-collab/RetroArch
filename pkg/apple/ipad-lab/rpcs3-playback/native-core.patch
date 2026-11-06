@@ -1,0 +1,28 @@
+--- a/rpcs3/ios/RPCS3IOS.cpp
++++ b/rpcs3/ios/RPCS3IOS.cpp
+@@ -1400,6 +1400,7 @@
+ 
+ 		g_log_listener = std::make_unique<callback_log_listener>();
+ 		logs::listener::add(g_log_listener.get());
++		logs::set_init({});
+ 
+ 		// A developer can request one bounded SPU profile through the injected
+ 		// cache root. Consume the request so subsequent launches stay unchanged.
+--- a/rpcs3/Emu/Cell/Modules/cellMic.cpp
++++ b/rpcs3/Emu/Cell/Modules/cellMic.cpp
+@@ -930,8 +930,13 @@
+ {
+ 	cellMic.trace("cellMicIsAttached(dev_num=%d)", dev_num);
+ 
+-	// TODO
+-	return 1;
++	auto& mic_thr = g_fxo->get<mic_thread>();
++	const std::lock_guard lock(mic_thr.mutex);
++	if (!mic_thr.init)
++		return 1; // Preserve the existing pre-initialization behavior.
++
++	// Only report registered microphones as attached after initialization.
++	return mic_thr.check_device(dev_num) ? 1 : 0;
+ }
+ 
+ error_code cellMicClose(s32 dev_num)

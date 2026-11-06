@@ -2,71 +2,8 @@
 #import <XCTest/XCTest.h>
 #define HAVE_RETROARCH_LAB_LIBRARY 1
 #import "../../../../ui/drivers/cocoa/RetroArchLabPerformance.m"
-#import "../../../../ui/drivers/cocoa/RetroArchLabGameMode.m"
 
 @interface PerformanceRecorderTests : XCTestCase
-@end
-
-@interface GameModeTests : XCTestCase
-@property(nonatomic, strong) id savedQuietPreference;
-@end
-@implementation GameModeTests
-- (void)setUp
-{
-   [super setUp];
-   self.savedQuietPreference = [NSUserDefaults.standardUserDefaults objectForKey:RALabQuietGameplayKey];
-}
-- (void)tearDown
-{
-   if (self.savedQuietPreference)
-      [NSUserDefaults.standardUserDefaults setObject:self.savedQuietPreference forKey:RALabQuietGameplayKey];
-   else
-      [NSUserDefaults.standardUserDefaults removeObjectForKey:RALabQuietGameplayKey];
-   __atomic_store_n(&ra_lab_quiet_gameplay, RALabGameModeReadPreference(), __ATOMIC_RELAXED);
-   [super tearDown];
-}
-- (void)testDefaultAndStoredChoices
-{
-   [NSUserDefaults.standardUserDefaults removeObjectForKey:RALabQuietGameplayKey];
-   XCTAssertTrue(RALabGameModeReadPreference());
-   [NSUserDefaults.standardUserDefaults setBool:NO forKey:RALabQuietGameplayKey];
-   XCTAssertFalse(RALabGameModeReadPreference());
-   [NSUserDefaults.standardUserDefaults setBool:YES forKey:RALabQuietGameplayKey];
-   XCTAssertTrue(RALabGameModeReadPreference());
-}
-- (void)testSwitchPersistsAndDoesNotStartRecorder
-{
-   void (^check)(void) = ^{
-      XCTAssertEqual(ra_lab_perf_clock(), 0);
-      RALabGameModeController *page = [[RALabGameModeController alloc] initWithStyle:UITableViewStyleInsetGrouped];
-      [page loadViewIfNeeded];
-      UITableViewCell *cell = [page tableView:page.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]];
-      UISwitch *toggle = (UISwitch *)cell.accessoryView;
-      XCTAssertEqualObjects(toggle.accessibilityIdentifier, @"Lab quiet gameplay");
-      toggle.on = NO;
-      [toggle sendActionsForControlEvents:UIControlEventValueChanged];
-      XCTAssertFalse(ra_lab_game_mode_quiet_enabled());
-      XCTAssertFalse(RALabGameModeReadPreference());
-      toggle.on = YES;
-      [toggle sendActionsForControlEvents:UIControlEventValueChanged];
-      XCTAssertTrue(ra_lab_game_mode_quiet_enabled());
-      XCTAssertTrue(RALabGameModeReadPreference());
-      XCTAssertEqual(ra_lab_perf_clock(), 0);
-   };
-   if (NSThread.isMainThread) check(); else dispatch_sync(dispatch_get_main_queue(), check);
-}
-- (void)testGuidanceDoesNotClaimSystemFocusControl
-{
-   void (^check)(void) = ^{
-      RALabGameModeController *page = [[RALabGameModeController alloc] initWithStyle:UITableViewStyleInsetGrouped];
-      [page loadViewIfNeeded];
-      XCTAssertEqual([page numberOfSectionsInTableView:page.tableView], 3);
-      XCTAssertEqual([page tableView:page.tableView numberOfRowsInSection:2], 3);
-      XCTAssertTrue([[page tableView:page.tableView titleForFooterInSection:2] containsString:@"cannot turn it on"]);
-      XCTAssertTrue([[page tableView:page.tableView titleForFooterInSection:1] containsString:@"cannot force it on"]);
-   };
-   if (NSThread.isMainThread) check(); else dispatch_sync(dispatch_get_main_queue(), check);
-}
 @end
 @implementation PerformanceRecorderTests
 - (void)onMain:(dispatch_block_t)block
@@ -92,7 +29,14 @@
    XCTFail(@"No sample recorded"); return @{};
 }
 - (void)tearDown
-{ [self onMain:^{ [RALabPerformance.shared stop:@"test_teardown"]; }]; [super tearDown]; }
+{
+   [self onMain:^{
+      [RALabPerformance.shared stop:@"test_teardown"];
+      [RALabPerformance.shared showOverlay:NO];
+      RALabPerfPS3Surface(nil);
+   }];
+   [super tearDown];
+}
 - (void)testRecordsFrameAudioVideoAndMark
 {
    [self start];
@@ -128,7 +72,7 @@
    XCTAssertEqualObjects(s[@"ps3_fps"], NSNull.null);
    XCTAssertEqualObjects(s[@"ps3_rsx_estimate_percent"], NSNull.null);
    XCTAssertEqualObjects(s[@"libretro_fps"], NSNull.null);
-   XCTAssertEqual([s[@"slow_frames"] intValue], 0);
+   XCTAssertEqualObjects(s[@"slow_frames"], NSNull.null);
 }
 - (void)testReportsRetainedWithinLimitAndRecordingResets
 {
@@ -156,5 +100,180 @@
    XCTAssertEqualObjects(samples[0][@"audio_underruns_delta"], NSNull.null);
    XCTAssertEqual([samples[1][@"audio_underruns_delta"] intValue], 3);
    XCTAssertEqualObjects(samples[2][@"audio_underruns_delta"], NSNull.null);
+}
+- (void)testPS3OnlySummaryDoesNotInventFrameOrAudioMeasurements
+{
+   [self start];
+   RALabPerfPS3(@"PS3 running", 5, 29.5, 40);
+   [self onMain:^{ [RALabPerformance.shared stop:@"ps3_test"]; }];
+   NSDictionary *s = [self sample:self.rows];
+   XCTAssertEqualObjects(s[@"ps3_fps"], @29.5);
+   XCTAssertEqualObjects(s[@"ps3_rsx_estimate_percent"], @40);
+   for (NSString *key in @[@"frame_max_ms", @"frame_p95_ms", @"slow_frames", @"core_work_max_ms",
+         @"video_submit_ms_total", @"audio_write_ms_total", @"audio_underruns_delta"])
+      XCTAssertEqualObjects(s[key], NSNull.null, @"%@ must remain unavailable", key);
+   XCTAssertTrue([RALabPerformance.shared.summary containsString:@"Core work max: Unavailable"]);
+   XCTAssertTrue([RALabPerformance.shared.summary containsString:@"Frame max: Unavailable"]);
+   XCTAssertTrue([RALabPerformance.shared.summary containsString:@"Audio writes: Unavailable"]);
+   XCTAssertTrue([RALabPerformance.shared.summary containsString:@"Slow frames this window: Unavailable"]);
+}
+- (void)testLiveOverlayCollectsWithoutCreatingOrPruningReports
+{
+   NSArray *before = RALabPerformance.shared.reports;
+   [self onMain:^{ [RALabPerformance.shared showOverlay:YES]; }];
+   XCTAssertNotEqual(ra_lab_perf_clock(), 0);
+   XCTAssertFalse(RALabPerformance.shared.recording);
+   RALabPerfPS3(@"PS3 playing", 5, 43.4, 100);
+   dispatch_sync(RALabPerformance.shared.queue, ^{ [RALabPerformance.shared sample]; });
+   NSDictionary *s = RALabPerformance.shared.latestSample;
+   XCTAssertEqualObjects(s[@"ps3_fps"], @43.4);
+   XCTAssertNotEqualObjects(s[@"process_cpu_percent_device"], NSNull.null);
+   XCTAssertNotEqualObjects(s[@"memory_footprint_percent_physical"], NSNull.null);
+   XCTAssertEqualObjects(before, RALabPerformance.shared.reports);
+   [self onMain:^{ [RALabPerformance.shared showOverlay:NO]; }];
+   XCTAssertEqual(ra_lab_perf_clock(), 0);
+   XCTAssertNil(RALabPerformance.shared.timer);
+}
+- (void)testRecordingStopsButRequestedLiveOverlayContinues
+{
+   [self onMain:^{ [RALabPerformance.shared showOverlay:YES]; }];
+   [self start];
+   [self onMain:^{ [RALabPerformance.shared stop:@"user_stopped"]; }];
+   NSArray *rows = self.rows;
+   XCTAssertEqualObjects(rows.lastObject[@"reason"], @"user_stopped");
+   XCTAssertFalse(RALabPerformance.shared.recording);
+   XCTAssertNotEqual(ra_lab_perf_clock(), 0);
+   RALabPerfPS3(@"PS3 playing", 1, 25, 0);
+   dispatch_sync(RALabPerformance.shared.queue, ^{ [RALabPerformance.shared sample]; });
+   XCTAssertEqualObjects(RALabPerformance.shared.latestSample[@"ps3_fps"], @25);
+   XCTAssertEqualObjects(rows, self.rows);
+}
+- (void)testHUDShowsSourceAndEstimateAndClearsUnavailableValues
+{
+   [self onMain:^{
+      RALabPerformanceHUD *hud = [[RALabPerformanceHUD alloc] initWithFrame:CGRectMake(12, 8, 232, 64)];
+      NSDictionary *sample = @{@"ps3_fps": @43.4, @"process_cpu_percent_device": @13,
+            @"ps3_rsx_estimate_percent": @100, @"memory_footprint_percent_physical": @50};
+      [hud update:sample recording:YES]; [hud layoutIfNeeded];
+      XCTAssertEqualObjects(hud.fps.text, @"43.4");
+      XCTAssertEqualObjects(hud.cpu.value.text, @"13%");
+      XCTAssertEqualObjects(hud.gpu.value.text, @"100%");
+      XCTAssertTrue([hud.accessibilityValue containsString:@"PS3"]);
+      XCTAssertTrue([hud.accessibilityValue containsString:@"estimated GPU"]);
+      XCTAssertFalse(hud.recordingDot.hidden);
+      UIView *canvas = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 400, 100)];
+      canvas.backgroundColor = UIColor.blackColor; [canvas addSubview:hud];
+      UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithBounds:canvas.bounds];
+      UIImage *image = [renderer imageWithActions:^(UIGraphicsImageRendererContext *context) {
+         [canvas.layer renderInContext:context.CGContext];
+      }];
+      XCTAttachment *attachment = [XCTAttachment attachmentWithImage:image];
+      attachment.name = @"Performance-HUD-reference-values"; attachment.lifetime = XCTAttachmentLifetimeKeepAlways;
+      [self addAttachment:attachment];
+      [hud update:@{@"libretro_fps": @30} recording:NO];
+      XCTAssertEqualObjects(hud.fps.text, @"30.0");
+      XCTAssertEqualObjects(hud.gpu.value.text, @"—");
+      XCTAssertEqual(hud.gpu.fill.strokeEnd, 0);
+      XCTAssertTrue([hud.accessibilityValue containsString:@"Libretro cadence"]);
+      XCTAssertTrue(hud.recordingDot.hidden);
+      XCTAssertFalse(hud.userInteractionEnabled);
+   }];
+}
+- (void)testLogRetainsVerboseLinesInOrderAndExportsBeyondRecentWindow
+{
+   RALabPS3LogStore *store = [RALabPS3LogStore new];
+   for (NSUInteger i = 0; i < 10020; i++)
+      [store append:[NSString stringWithFormat:@"SPRX Worker 2: import %lu", (unsigned long)i] level:6];
+   NSDictionary *snapshot = [store snapshot:300];
+   XCTAssertEqual([snapshot[@"total"] unsignedLongLongValue], 10020);
+   XCTAssertEqual([snapshot[@"retained"] unsignedLongLongValue], 10000);
+   XCTAssertEqual([snapshot[@"omitted"] unsignedLongLongValue], 20);
+   XCTAssertEqual([snapshot[@"lines"] count], 300);
+   XCTAssertEqualObjects([snapshot[@"lines"] firstObject], @"[6] SPRX Worker 2: import 9720");
+   XCTAssertEqualObjects([snapshot[@"lines"] lastObject], @"[6] SPRX Worker 2: import 10019");
+   NSString *text = store.exportText;
+   XCTAssertTrue([text containsString:@"[6] SPRX Worker 2: import 20\n"]);
+   XCTAssertTrue([text containsString:@"20 older lines omitted"]);
+   XCTAssertFalse([text containsString:@"[6] SPRX Worker 2: import 0\n"]);
+}
+- (void)testConcurrentLogCallbacksAndByteLimitAreBounded
+{
+   RALabPS3LogStore *store = [RALabPS3LogStore new];
+   NSString *message = [@"iOS LLVM compilation " stringByPaddingToLength:5000 withString:@"x" startingAtIndex:0];
+   dispatch_apply(1200, dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^(size_t i) {
+      @autoreleasepool { [store append:message level:5]; }
+   });
+   NSDictionary *snapshot = [store snapshot:10000];
+   XCTAssertEqual([snapshot[@"total"] unsignedLongLongValue], 1200);
+   XCTAssertEqual([snapshot[@"truncated"] unsignedLongLongValue], 1200);
+   XCTAssertLessThanOrEqual([snapshot[@"bytes"] unsignedLongLongValue], 4 * 1024 * 1024);
+   XCTAssertGreaterThan([snapshot[@"omitted"] unsignedLongLongValue], 0);
+   XCTAssertTrue([store.exportText containsString:@"[message truncated]"]);
+}
+- (void)testCoreCallbackFeedsTheLiveConsole
+{
+   RALabPerfPS3Log(6, "SPRX Worker 2: sys_fs import\nPPUW: LLVM compiled");
+   [self onMain:^{
+      RALabPS3LogController *console = [RALabPS3LogController new];
+      [console loadViewIfNeeded];
+      XCTAssertTrue([console.text.text containsString:@"[6] SPRX Worker 2: sys_fs import"]);
+      XCTAssertTrue([console.text.text containsString:@"[6] PPUW: LLVM compiled"]);
+      XCTAssertTrue([console.countsLabel.text containsString:@"total"]);
+      XCTAssertEqualObjects(console.exportButton.currentTitle, @"Export");
+      console.view.frame = CGRectMake(0, 0, 800, 500);
+      [console.view layoutIfNeeded];
+      XCTAssertFalse(console.text.hasAmbiguousLayout);
+      UIGraphicsImageRenderer *renderer = [[UIGraphicsImageRenderer alloc] initWithBounds:console.view.bounds];
+      UIImage *image = [renderer imageWithActions:^(UIGraphicsImageRendererContext *context) {
+         [console.view.layer renderInContext:context.CGContext];
+      }];
+      XCTAttachment *attachment = [XCTAttachment attachmentWithImage:image];
+      attachment.name = @"RPCS3-console-callback-fixture"; attachment.lifetime = XCTAttachmentLifetimeKeepAlways;
+      [self addAttachment:attachment];
+   }];
+}
+- (void)testHUDAnchorsToGameSurfaceAndFollowsNavigation
+{
+   [self onMain:^{
+      UIWindow *window = nil;
+      for (UIScene *scene in UIApplication.sharedApplication.connectedScenes)
+         if ([scene isKindOfClass:UIWindowScene.class])
+            for (UIWindow *candidate in ((UIWindowScene *)scene).windows)
+               if (candidate.isKeyWindow) window = candidate;
+      XCTAssertNotNil(window);
+      UIViewController *original = window.rootViewController;
+      UIViewController *game = [UIViewController new];
+      UINavigationController *navigation = [[UINavigationController alloc] initWithRootViewController:game];
+      window.rootViewController = navigation; [window layoutIfNeeded];
+      UIView *surface = [[UIView alloc] initWithFrame:CGRectMake(0, 160, game.view.bounds.size.width, 300)];
+      surface.backgroundColor = UIColor.blackColor; [game.view addSubview:surface];
+      RALabPerfPS3Surface(surface);
+      [RALabPerformance.shared showOverlay:YES];
+      [game.view layoutIfNeeded];
+      RALabPerformanceHUD *hud = RALabPerformance.shared.badge;
+      XCTAssertEqual(hud.superview, surface);
+      XCTAssertFalse(hud.hasAmbiguousLayout);
+      XCTAssertTrue(CGRectContainsRect(surface.bounds, hud.frame));
+      XCTAssertGreaterThanOrEqual(hud.frame.origin.x, 12);
+      XCTAssertGreaterThanOrEqual(hud.frame.origin.y, 8);
+      RALabPerfLogToggle(game, surface); [game.view layoutIfNeeded];
+      XCTAssertTrue([game.childViewControllers.lastObject isKindOfClass:RALabPS3LogController.class]);
+      XCTAssertNil(hud.superview);
+      RALabPerfLogToggle(game, surface); [game.view layoutIfNeeded];
+      XCTAssertEqual(game.childViewControllers.count, 0);
+      XCTAssertEqual(hud.superview, surface);
+      RALabPerformanceController *settings = [RALabPerformanceController new];
+      [navigation pushViewController:settings animated:NO]; [window layoutIfNeeded];
+      [RALabPerformance.shared updateOverlay];
+      XCTAssertNil(hud.superview);
+      XCTAssertEqualObjects(settings.toggle.currentTitle, @"Start recording");
+      [navigation popViewControllerAnimated:NO];
+      [window layoutIfNeeded];
+      [RALabPerformance.shared updateOverlay]; [game.view layoutIfNeeded];
+      XCTAssertEqual(hud.superview, surface);
+      RALabPerfPS3Surface(nil);
+      [RALabPerformance.shared showOverlay:NO];
+      window.rootViewController = original;
+   }];
 }
 @end

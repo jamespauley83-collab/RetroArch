@@ -58,6 +58,7 @@ static void RALabPS3Main(void *context, rpcs3_ios_main_thread_task task, void *p
 static void RALabPS3Log(void *context, int32_t level, const char *message)
 {
    (void)context;
+   RALabPerfPS3Log(level, message);
    if (level <= 4) NSLog(@"[Lab PS3] %@", RALabPS3String(message));
 }
 
@@ -133,6 +134,8 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
    self.navigationItem.rightBarButtonItems = @[
       [[UIBarButtonItem alloc] initWithTitle:@"Performance"
             style:UIBarButtonItemStylePlain target:self action:@selector(openPerformance)],
+      [[UIBarButtonItem alloc] initWithTitle:@"Log"
+            style:UIBarButtonItemStylePlain target:self action:@selector(openLog)],
       [[UIBarButtonItem alloc] initWithTitle:@"Game Mode"
             style:UIBarButtonItemStylePlain target:self action:@selector(openGameMode)]];
 #endif
@@ -230,12 +233,18 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
    self.stopButton.enabled = !self.stopping;
    self.table.hidden = self.playing;
    self.surface.hidden = self.controls.hidden = !self.playing;
+   RALabPerfPS3Surface(self.playing ? self.surface : nil);
    self.table.userInteractionEnabled = ra_ps3_ready && !self.busy;
    self.navigationItem.hidesBackButton = self.busy || self.playing;
    self.navigationController.modalInPresentation = self.busy || self.playing;
 }
 #ifdef HAVE_RETROARCH_LAB_LIBRARY
 - (void)openPerformance { RALabPerfShow(self); }
+- (void)openLog
+{
+   if (self.playing) RALabPerfLogToggle(self, self.surface);
+   else RALabPerfLogShow(self);
+}
 - (void)openGameMode { RALabGameModeShow(self); }
 #endif
 #ifndef RA_LAB_PS3_INTERPRETER_ONLY
