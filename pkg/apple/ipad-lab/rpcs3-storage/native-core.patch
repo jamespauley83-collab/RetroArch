@@ -1,0 +1,104 @@
+--- a/rpcs3/ios/GameLibrary.cpp
++++ b/rpcs3/ios/GameLibrary.cpp
+@@ -1,5 +1,6 @@
+ #include "GameLibrary.h"
+ #include "RPCS3IOSSettings.h"
++#include "RPCS3IOSPlatform.h"
+ #include "GameArchiveContract.h"
+ #include "GameFolderContract.h"
+ #include "GamePatchContract.h"
+@@ -12,6 +13,7 @@
+ #include "Loader/PSF.h"
+ #include "Utilities/File.h"
+ #include "Utilities/Thread.h"
++#include "util/logs.hpp"
+ 
+ #include <minizip/unzip.h>
+ 
+@@ -28,6 +30,8 @@
+ #include <thread>
+ #include <unordered_set>
+ #include <vector>
++
++LOG_CHANNEL(ios_game_library_log, "iOS Game Library");
+ 
+ namespace rpcs3::ios
+ {
+@@ -1315,16 +1319,28 @@
+ 			fs::remove_all(root + entry.name, true, true);
+ 		}
+ 	}
++	u64 available_capacity = 0;
++	const bool important_capacity = available_capacity_for_import(root, available_capacity);
+ 	fs::device_stat device{};
+-	if (!fs::statfs(root, device))
+-	{
+-		return iso_installation_failed("Unable to determine free space for ISO installation");
+-	}
+-	if (device.avail_free < total_size)
++	const bool filesystem_capacity = fs::statfs(root, device);
++	if (!important_capacity)
++	{
++		if (!filesystem_capacity)
++		{
++			return iso_installation_failed("Unable to determine free space for ISO installation");
++		}
++		available_capacity = device.avail_free;
++	}
++	ios_game_library_log.notice(
++		"ISO import storage: required=%u, available=%u, source=%s, filesystem_available=%s",
++		total_size, available_capacity, important_capacity ? "important usage" : "filesystem",
++		filesystem_capacity ? std::to_string(device.avail_free) : "unavailable");
++	if (available_capacity < total_size)
+ 	{
+ 		return iso_installation_failed(fmt::format(
+-			"Not enough free space to install the ISO (need at least %s more)",
+-			formatted_byte_size(total_size - device.avail_free)));
++			"Not enough free space to install the ISO (ISO %s; available %s; need at least %s more)",
++			formatted_byte_size(iso_size), formatted_byte_size(available_capacity),
++			formatted_byte_size(total_size - available_capacity)));
+ 	}
+ 	static std::atomic<u64> import_counter{0};
+ 	temporary_directory temporary{
+--- a/rpcs3/ios/RPCS3IOSPlatform.h
++++ b/rpcs3/ios/RPCS3IOSPlatform.h
+@@ -1,10 +1,12 @@
+ #pragma once
+ 
++#include <cstdint>
+ #include <string>
+ #include <string_view>
+ 
+ namespace rpcs3::ios
+ {
++bool available_capacity_for_import(const std::string& path, std::uint64_t& capacity) noexcept;
+ bool display_sleep_control_supported() noexcept;
+ void enable_display_sleep(bool enable) noexcept;
+ std::string preferred_language_identifier();
+--- a/rpcs3/ios/RPCS3IOSPlatform.mm
++++ b/rpcs3/ios/RPCS3IOSPlatform.mm
+@@ -131,6 +131,24 @@
+ #endif
+ }
+ 
++bool available_capacity_for_import(const std::string& path, std::uint64_t& capacity) noexcept
++{
++	@autoreleasepool
++	{
++		NSURL* url = [NSURL fileURLWithFileSystemRepresentation:path.c_str()
++			isDirectory:YES relativeToURL:nil];
++		NSNumber* value = nil;
++		if (![url getResourceValue:&value
++			forKey:NSURLVolumeAvailableCapacityForImportantUsageKey error:nil] ||
++			![value isKindOfClass:NSNumber.class] || value.longLongValue < 0)
++		{
++			return false;
++		}
++		capacity = static_cast<std::uint64_t>(value.longLongValue);
++		return true;
++	}
++}
++
+ bool display_sleep_control_supported() noexcept
+ {
+ #if TARGET_OS_VISION

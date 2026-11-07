@@ -1,0 +1,115 @@
+{
+  "version": "1.22.2",
+  "build": 14,
+  "bundle_identifier": "com.jamespauley.retroarchlab.ps3bridge",
+  "source_commit": "71543962a8686e622129f9371d20aa11f2d76022",
+  "native_commit": "f88bff947b83730c0cf8a3949f59338b992b3ca0",
+  "patches": [
+    {
+      "path": "testflight-interpreters/rpcs3-interpreter-only.patch",
+      "sha256": "d1ad9b5ddfded01dcd1e102a42c16873486a501844989b509a91c24fadbfb92a",
+      "applied_patch_check": true
+    },
+    {
+      "path": "rpcs3-playback/native-core.patch",
+      "sha256": "53a103b59d15d36e9349ad2d3f18214fc10cd0e2a95f83d664e513e27db15561",
+      "applied_patch_check": true
+    },
+    {
+      "path": "rpcs3-storage/native-core.patch",
+      "sha256": "4fedf5bc94980e7de521bbaf1d7f85250d6d99bf8d72a1b9347c813c230d26b8",
+      "applied_patch_check": true
+    }
+  ],
+  "dependencies": [
+    {
+      "name": "MoltenVK",
+      "version": "1.4.2",
+      "url": "https://github.com/KhronosGroup/MoltenVK/releases/download/v1.4.2/MoltenVK-ios.tar",
+      "sha256": "b5d947b1660e6e9fed40b9cd2387e160aaab9e80b775c0cef7e14059405178c1"
+    },
+    {
+      "name": "FFmpeg",
+      "version": "8.1.1",
+      "url": "https://ffmpeg.org/releases/ffmpeg-8.1.1.tar.xz",
+      "sha256": "b6863adde98898f42602017462871b5f6333e65aec803fdd7a6308639c52edf3"
+    }
+  ],
+  "xcode": "27.2 (27B52)",
+  "native_target": "iOS arm64, minimum iOS 16.0",
+  "host_minimum_ios": "26.0",
+  "runtime": "PPU/SPU static interpreters; LLVM and JIT disabled",
+  "host_unsigned_bytes": 16885088,
+  "host_unsigned_sha256": "c49f41ce18f22fdd0889eb49418dc23d63e5a0a807486e8bd031f571b8b19443",
+  "core_unsigned_bytes": 47288760,
+  "core_unsigned_sha256": "b5313c47d0fce7c3560fe43699fd9eb88cdad0f93e2a2a730220d04fe2390255",
+  "distribution_ipa_bytes": 54988845,
+  "distribution_ipa_sha256": "79a81ace8e2f6c905f039ed3a45b3c3219964c6fb01685b62b8b667b7a12e03d",
+  "emulator_backends": 8,
+  "signature_verification": "deep strict passed",
+  "privacy_disk_space_reasons": [
+    "E174.1",
+    "85F4.1",
+    "7D9E.1"
+  ],
+  "upload": {
+    "accepted": true,
+    "completed_utc": "2026-11-07T21:35:48.886448+00:00",
+    "processing_at_upload_completion": true,
+    "testflight_availability_verified": false,
+    "tester_notes_published": false,
+    "internal_testing_only": true
+  },
+  "iphone": {
+    "installed_version": "1.22.2",
+    "installed_build": "14",
+    "install_method": "in-place development-signed package; no debugger entitlement",
+    "documents_before": 44038,
+    "documents_after": 44038,
+    "missing_paths": 0,
+    "changed_sizes_or_types": 0,
+    "backed_up_files_checked": 7,
+    "backup_hashes_match": true,
+    "launch_check": "completed on follow-up: firmware imported and game title screen visually verified",
+    "iso_import_verified": true,
+    "initial_launch_check": "not run: device locked; waiting test cancelled",
+    "imported_game": {
+      "title": "50 Cent: Blood On The Sand",
+      "title_id": "BLUS30256",
+      "iso_bytes": 6709772288,
+      "evidence": "device library and imported file inventory; user screenshot"
+    },
+    "firmware": {
+      "version": "4.93",
+      "release": "04.9300",
+      "previously_installed": false,
+      "installation_method": "app Import > Firmware (.PUP), existing user recovery copy",
+      "pup_bytes": 206197916,
+      "pup_md5": "a2b60b6ac1d2e49e230144345616927c",
+      "pup_sha256": "158471fd834f8ea8036136b6aab43cd86c7ba73d79ca30e0af3c0fe0001cf365",
+      "checksum_matches_official_download_url": true,
+      "installed_files": 1075,
+      "installed_bytes": 195078808,
+      "game_files_checked": 7,
+      "game_sizes_and_modification_times_preserved": true,
+      "original_mac_pup_retained": true
+    },
+    "boot_follow_up": {
+      "initial_probe_timeout_seconds": 180,
+      "initial_probe_passed": false,
+      "later_game_running_observed": true,
+      "title_screen_visually_verified": true,
+      "title_screen_prompt": "Press START button",
+      "audio_frame_delivery_observed": true,
+      "audible_audio_verified": false,
+      "level_gameplay_verified": false,
+      "sustained_performance_verified": false,
+      "final_state": "paused at title screen; Resume available",
+      "pause_verified_utc": "2026-11-07T22:03:30Z"
+    },
+    "actual_storage_reclamation_verified": false,
+    "original_capacity_discrepancy_measured": false
+  },
+  "ipad": "existing build 13 retained",
+  "build_location": "local Mac; no hosted build requested"
+}
