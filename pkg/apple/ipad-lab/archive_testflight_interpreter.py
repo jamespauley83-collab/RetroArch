@@ -57,6 +57,24 @@ def framework_binary(framework):
     return framework / info['CFBundleExecutable']
 
 
+def declare_import_storage_usage(app):
+    path = app / 'PrivacyInfo.xcprivacy'
+    manifest = plistlib.loads(path.read_bytes()) if path.exists() else {}
+    entries = manifest.setdefault('NSPrivacyAccessedAPITypes', [])
+    category = 'NSPrivacyAccessedAPICategoryDiskSpace'
+    entry = next((item for item in entries
+                  if item.get('NSPrivacyAccessedAPIType') == category), None)
+    if entry is None:
+        entry = {'NSPrivacyAccessedAPIType': category,
+                 'NSPrivacyAccessedAPITypeReasons': []}
+        entries.append(entry)
+    reasons = entry.setdefault('NSPrivacyAccessedAPITypeReasons', [])
+    for reason in ('E174.1', '85F4.1', '7D9E.1'):
+        if reason not in reasons:
+            reasons.append(reason)
+    path.write_bytes(plistlib.dumps(manifest))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--base-app', type=Path, required=True)
@@ -95,6 +113,7 @@ def main():
     app = args.archive / 'Products/Applications/RetroArch.app'
     app.parent.mkdir(parents=True)
     run(['ditto', '--noextattr', '--norsrc', args.base_app, app])
+    declare_import_storage_usage(app)
     shutil.copyfile(args.host, app / 'RetroArch')
     (app / 'RetroArch').chmod(0o755)
     frameworks = app / 'Frameworks'
