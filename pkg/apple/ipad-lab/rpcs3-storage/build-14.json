@@ -70,8 +70,45 @@
     "changed_sizes_or_types": 0,
     "backed_up_files_checked": 7,
     "backup_hashes_match": true,
-    "launch_check": "not run: device locked; waiting test cancelled",
-    "iso_import_verified": false
+    "launch_check": "completed on follow-up: firmware imported and game title screen visually verified",
+    "iso_import_verified": true,
+    "initial_launch_check": "not run: device locked; waiting test cancelled",
+    "imported_game": {
+      "title": "50 Cent: Blood On The Sand",
+      "title_id": "BLUS30256",
+      "iso_bytes": 6709772288,
+      "evidence": "device library and imported file inventory; user screenshot"
+    },
+    "firmware": {
+      "version": "4.93",
+      "release": "04.9300",
+      "previously_installed": false,
+      "installation_method": "app Import > Firmware (.PUP), existing user recovery copy",
+      "pup_bytes": 206197916,
+      "pup_md5": "a2b60b6ac1d2e49e230144345616927c",
+      "pup_sha256": "158471fd834f8ea8036136b6aab43cd86c7ba73d79ca30e0af3c0fe0001cf365",
+      "checksum_matches_official_download_url": true,
+      "installed_files": 1075,
+      "installed_bytes": 195078808,
+      "game_files_checked": 7,
+      "game_sizes_and_modification_times_preserved": true,
+      "original_mac_pup_retained": true
+    },
+    "boot_follow_up": {
+      "initial_probe_timeout_seconds": 180,
+      "initial_probe_passed": false,
+      "later_game_running_observed": true,
+      "title_screen_visually_verified": true,
+      "title_screen_prompt": "Press START button",
+      "audio_frame_delivery_observed": true,
+      "audible_audio_verified": false,
+      "level_gameplay_verified": false,
+      "sustained_performance_verified": false,
+      "final_state": "paused at title screen; Resume available",
+      "pause_verified_utc": "2026-11-07T22:03:30Z"
+    },
+    "actual_storage_reclamation_verified": false,
+    "original_capacity_discrepancy_measured": false
   },
   "ipad": "existing build 13 retained",
   "build_location": "local Mac; no hosted build requested"

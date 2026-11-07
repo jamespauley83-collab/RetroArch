@@ -3,9 +3,10 @@
 Status: **1.22.2 (14)** was built, signed, installed in place on the iPhone and
 uploaded successfully on November 7, 2026. Apple reported processing at upload
 completion; TestFlight availability has not been independently confirmed.
-The failing iPhone import has not yet been repeated because the device was
-locked during the attempted launch check. See [release validation](VALIDATION.md)
-and the [artifact record](build-14.json).
+The iPhone follow-up confirmed the imported 6.71 GB ISO and a successful boot to
+the game's title screen after installing the missing PS3 4.93 firmware. The game
+was left paused. See [release validation](VALIDATION.md) and the
+[artifact record](build-14.json).
 
 ## Observed problem
 
@@ -87,16 +88,23 @@ zero values, missing/wrong-type/negative values, query failure and 64-bit capaci
 
 These focused harnesses do not exercise actual iOS storage reclamation or copy
 a game. A subsequent complete native and host build, signed archive, App Store
-Connect export/upload, and in-place iPhone installation succeeded. Hardware ISO
-import acceptance remains pending. No hosted CI build was requested.
+Connect export/upload, and in-place iPhone installation succeeded. The iPhone
+follow-up verified the imported ISO and boot to the title screen. Actual storage
+reclamation and the two capacity readings were not measured. No hosted CI build
+was requested.
 
 ## Device acceptance
 
-Import the same 6.71 GB ISO from iCloud Drive. Verify the original remains
-available and the game appears in the PS3 library. Inspect the new storage line
-in the PS3 log; if copying still fails, retain that log and the exact error.
-Separately confirm that a genuine shortage still produces a recoverable error.
-Check that existing firmware, games and saves remain accessible.
+The PS3 library contains **50 Cent: Blood On The Sand**, **BLUS30256**, and its
+6,709,772,288-byte imported ISO. After installation of the missing firmware, the
+app reports firmware 4.93 and reaches the game's "Press START button" title screen.
+All seven imported game files retained their sizes and modification times during
+firmware installation. The game was left paused with Resume available.
+
+Remaining checks cover a genuine storage shortage, actual storage reclamation,
+and hands-on gameplay, controls, audible sound, sustained performance and
+save/relaunch behavior. The iCloud source was not freshly inventoried during
+this follow-up. See the validation record for the successful checks and limits.
 
 ## Sources
 

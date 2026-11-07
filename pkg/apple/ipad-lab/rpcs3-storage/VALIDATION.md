@@ -12,10 +12,49 @@ The Browser connector lacked the originating authenticated browser context;
 a separate altool status request lacked its required authentication. Neither
 limitation was bypassed. The existing Xcode account completed export and upload.
 
-The attempted external-app launch check stopped at Xcode's device preflight:
-"Unlock Dad phone to Continue." It was cancelled without running the test.
-No successful PS3 initialization, ISO import, storage reclamation or game boot
-is claimed for this candidate. The iPad remains on build 13.
+The initial external-app launch check stopped at Xcode's device preflight:
+"Unlock Dad phone to Continue." It was cancelled without running the test. A
+later unlocked-device follow-up verified the imported ISO, installed the missing
+firmware and reached the game's title screen. The iPad remains on build 13.
+
+## Firmware follow-up and actual game boot
+
+The follow-up on November 7 confirmed build 14 and the imported **50 Cent: Blood
+On The Sand**, **BLUS30256**, with a **6,709,772,288-byte** `disc.iso`. The user's
+screenshot also showed the game in the library. The new error was "Firmware is
+missing." The app's firmware directories were empty in both the pre-update and
+follow-up inventories; the update had not removed installed firmware.
+
+Installed the user's existing **PS3 4.93** recovery PUP through the app's
+**Import → Firmware (.PUP)** flow. Its MD5,
+`a2b60b6ac1d2e49e230144345616927c`, matches the checksum embedded in the download
+URL linked from [Sony's official PS3 system-software page](https://www.playstation.com/en-us/support/hardware/ps3/system-software/).
+The original Mac copy was retained. Firmware verification found **1,075 files**,
+**195,078,808 bytes**, and `release:04.9300:` in `dev_flash/vsh/etc/version.txt`.
+All **7** imported game files retained their sizes and modification times across
+firmware installation. This is a check of those game files, not a fresh inventory
+of every save or the iCloud source.
+
+The first boot probe exceeded its **180-second** timeout while the app still
+reported initialization and first-time shader compilation. That probe failed
+its timeout; it did not report a firmware or emulator failure. A later check
+reported **"Game running"**, and visual inspection of its captured screenshot
+confirmed the game's **"Press START button" title screen**. The native log showed
+shader compilation and audio frame delivery. Audible output and audio quality
+were not observed.
+
+A final UI check successfully paused the game at **2026-11-07T22:03:30Z**. Its
+screenshot showed **Paused**, **Resume**, and the same title screen. Firmware
+import, follow-up log capture and pause checks each passed. The game was left
+paused for the user. No additional production app build was needed, and no
+firmware or game content is included in this repository.
+
+Local evidence under the retained build directory includes
+`iphone-firmware-verification.json`, `FirmwareImport3.xcresult`,
+`FirmwareGameBoot.xcresult` (the timed-out probe), `StartupLog.xcresult`,
+`PausedTitle.xcresult`, and their logs/screenshots. This verifies import completion
+and boot to the title screen. It does not establish the exact original storage
+discrepancy, actual storage reclamation, level gameplay or sustained performance.
 
 ## Build and package checks
 
@@ -36,8 +75,8 @@ is claimed for this candidate. The iPad remains on build 13.
 The focused source harness results remain: 13 preflight checks and 9 Foundation
 helper checks passed, with 7 failures from the unchanged preflight negative
 control. Their adapters and limits are described in [README](README.md).
-The separate device-launch runner compiled, but the locked phone prevented it
-from running.
+The initial device-launch runner compiled, but the locked phone prevented that
+first check from running. The later device checks are recorded above.
 
 ## In-place data verification
 
@@ -64,9 +103,9 @@ are retained under `/Users/jamespauley/Developer/RetroArch-Storage-Build-2026110
 
 ## Remaining acceptance
 
-On the unlocked iPhone, open RetroArch Lab, open PS3, start the core if prompted,
-and import the same 6.71 GB ISO from iCloud Drive. Confirm the original remains
-available and the game appears in the PS3 library. If import fails, export the
-PS3 log and retain the new error, which includes ISO size and available capacity.
-The diagnostic records selected capacity, its source and raw filesystem bytes.
-A successful import still does not establish game compatibility or performance.
+Hands-on gameplay, controller input, audible sound, sustained performance and
+save/relaunch behavior remain unverified. A real shortage/recovery scenario and
+actual iOS storage reclamation have not been exercised. The raw filesystem and
+important-usage readings from the original failure were not captured, so the
+precise original capacity discrepancy remains an inference. These limits do not
+change the observed successful import and firmware recovery on the iPhone.
