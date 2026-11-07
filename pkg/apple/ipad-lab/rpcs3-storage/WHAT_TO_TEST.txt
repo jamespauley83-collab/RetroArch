@@ -1,0 +1,11 @@
+RetroArch Lab 1.22.2 (14) — PS3 ISO storage correction
+
+This update checks Apple's capacity estimate for a user-requested import on the destination volume. It includes the prior playback and performance-monitoring changes.
+
+1. Open RetroArch Lab, open PS3, and start the core if prompted.
+2. Retry importing the same 6.71 GB 50 Cent - Blood on the Sand ISO from iCloud Drive.
+3. Confirm that the original ISO remains available and the imported game appears in the PS3 library.
+4. If import fails, open Log and share the PS3 diagnostic report together with the exact error. The report includes required bytes, selected available capacity, the capacity source, and raw filesystem free bytes.
+5. Confirm existing firmware, games and saves are still accessible.
+
+The update retains interpreter execution. Import success, commercial-game compatibility and gameplay performance have not been established for this build.

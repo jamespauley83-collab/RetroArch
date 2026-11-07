@@ -1,8 +1,11 @@
 # PS3 ISO import storage capacity
 
-Status: source correction and focused checks completed on November 7, 2026.
-No updated emulator binary has been built, installed or uploaded from this package.
-The failing iPhone import has not yet been repeated with this correction.
+Status: **1.22.2 (14)** was built, signed, installed in place on the iPhone and
+uploaded successfully on November 7, 2026. Apple reported processing at upload
+completion; TestFlight availability has not been independently confirmed.
+The failing iPhone import has not yet been repeated because the device was
+locked during the attempted launch check. See [release validation](VALIDATION.md)
+and the [artifact record](build-14.json).
 
 ## Observed problem
 
@@ -82,10 +85,10 @@ the production helper and temporarily replaces NSURL's resource-query method in
 the test process. It checks the requested key and destination path, positive and
 zero values, missing/wrong-type/negative values, query failure and 64-bit capacity.
 
-These checks do not compile the complete emulator, exercise actual iOS storage
-reclamation, copy a game, or establish hardware import success. The full native
-build/link, signed archive and physical iPhone acceptance remain pending. No
-hosted CI build was requested.
+These focused harnesses do not exercise actual iOS storage reclamation or copy
+a game. A subsequent complete native and host build, signed archive, App Store
+Connect export/upload, and in-place iPhone installation succeeded. Hardware ISO
+import acceptance remains pending. No hosted CI build was requested.
 
 ## Device acceptance
 
