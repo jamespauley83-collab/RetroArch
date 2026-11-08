@@ -1,0 +1,47 @@
+{
+  "build": 15,
+  "version": "1.22.2",
+  "bundle_identifier": "com.jamespauley.retroarchlab.ps3bridge",
+  "distribution": "development",
+  "host_sha256": "613895dbefc498787c5b763ea823739aa0170087df6e087ba1467bc4f37273cd",
+  "unsigned_native_core_sha256": "ccdae76a5be8e7c792687853d55bb73a8fa8b419bc072228e87f0f2966556389",
+  "native_commit": "f88bff947b83730c0cf8a3949f59338b992b3ca0",
+  "llvm_revision": "ca7933e47d3a3451d81e72ac174dcb5aa28b59d1",
+  "native_patches": [
+    "interpreter build option disabled",
+    "microphone and logger corrections",
+    "important-usage storage capacity"
+  ],
+  "libretro_cores": [
+    "armsx2",
+    "dolphin",
+    "fceumm",
+    "mednafen.saturn",
+    "opera",
+    "play",
+    "snes9x2010",
+    "yabause"
+  ],
+  "testflight_compatible": false,
+  "signed_native_core_sha256": "43990496dd28ebc5a19df9a1d3f8f67e89aa1af977728e4aa7f6779e7613cf70",
+  "signature_verified": true,
+  "runtime_validation": "blocked at XCTest passcode authorization; no build-15 JIT or gameplay success claimed",
+  "devices": [
+    {
+      "device": "iPhone 17 Pro Max",
+      "installed_build": 15,
+      "documents_before": 45573,
+      "documents_after": 45573,
+      "inventory_mismatches": [],
+      "recovery_hashes_matched": 21
+    },
+    {
+      "device": "iPad Air 11-inch (M3)",
+      "installed_build": 15,
+      "documents_before": 6139,
+      "documents_after": 6139,
+      "inventory_mismatches": [],
+      "recovery_hashes_matched": 78
+    }
+  ]
+}

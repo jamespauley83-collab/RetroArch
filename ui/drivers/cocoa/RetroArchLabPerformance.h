@@ -26,11 +26,13 @@ void RALabPerfLogToggle(UIViewController *parent, UIView *surface);
 void RALabPerfPS3Surface(UIView *surface);
 void RALabPerfPS3Log(int32_t level, const char *message);
 void RALabPerfEvent(NSString *event);
+void RALabPerfPrepareForRelaunch(void);
 void RALabPerfPS3(NSString *state, unsigned valid, double fps, double rsx);
 #else
 static inline void RALabPerfPS3Surface(UIView *surface) { (void)surface; }
 static inline void RALabPerfPS3Log(int32_t level, const char *message) { (void)level; (void)message; }
 static inline void RALabPerfEvent(NSString *event) { (void)event; }
+static inline void RALabPerfPrepareForRelaunch(void) {}
 static inline void RALabPerfPS3(NSString *state, unsigned valid, double fps, double rsx)
 { (void)state; (void)valid; (void)fps; (void)rsx; }
 #endif
