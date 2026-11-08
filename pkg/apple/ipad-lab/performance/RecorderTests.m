@@ -60,6 +60,33 @@
    XCTAssertTrue([[rows valueForKey:@"message"] containsObject:@"USER: slowdown noticed"]);
    XCTAssertEqual(ra_lab_perf_clock(), 0);
 }
+- (void)testJITHandoffPreservesAndFinishesRecording
+{
+   [self onMain:^{ [RALabPerformance.shared showOverlay:YES]; }];
+   [self start];
+   RALabPerfEvent(@"Before JIT handoff");
+   NSArray *reports = RALabPerformance.shared.reports;
+   [self onMain:^{ RALabPerfPrepareForRelaunch(); }];
+   NSArray *rows = self.rows;
+   XCTAssertEqualObjects(rows.firstObject[@"type"], @"session");
+   XCTAssertTrue([[rows valueForKey:@"message"] containsObject:@"Before JIT handoff"]);
+   XCTAssertEqualObjects(rows.lastObject[@"type"], @"end");
+   XCTAssertEqualObjects(rows.lastObject[@"reason"], @"jit_relaunch");
+   XCTAssertFalse(RALabPerformance.shared.recording);
+   XCTAssertEqual(RALabPerformance.shared.descriptor, -1);
+   XCTAssertNotEqual(ra_lab_perf_clock(), 0);
+   NSData *saved = [NSData dataWithContentsOfURL:reports.firstObject];
+   [self onMain:^{ RALabPerfPrepareForRelaunch(); }];
+   XCTAssertEqualObjects(saved, [NSData dataWithContentsOfURL:reports.firstObject]);
+   XCTAssertEqualObjects(reports, RALabPerformance.shared.reports);
+   [self onMain:^{
+      [RALabPerformance.shared showOverlay:NO];
+      RALabPerfPrepareForRelaunch();
+   }];
+   XCTAssertEqual(ra_lab_perf_clock(), 0);
+   XCTAssertEqualObjects(saved, [NSData dataWithContentsOfURL:reports.firstObject]);
+   XCTAssertEqualObjects(reports, RALabPerformance.shared.reports);
+}
 - (void)testUnavailablePS3MetricsAndPauseAreNotZeroOrStalls
 {
    [self start];
