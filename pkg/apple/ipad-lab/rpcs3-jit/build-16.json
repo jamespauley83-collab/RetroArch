@@ -1,0 +1,32 @@
+{
+  "build": 16,
+  "version": "1.22.2",
+  "bundle_identifier": "com.jamespauley.retroarchlab.ps3bridge",
+  "distribution": "development",
+  "host_sha256": "13db10c12f6792139551fd989449397f918d4341e2b8592dfc1b67ab6863f018",
+  "unsigned_native_core_sha256": "ccdae76a5be8e7c792687853d55bb73a8fa8b419bc072228e87f0f2966556389",
+  "native_commit": "f88bff947b83730c0cf8a3949f59338b992b3ca0",
+  "llvm_revision": "ca7933e47d3a3451d81e72ac174dcb5aa28b59d1",
+  "native_patches": [
+    "interpreter build option disabled",
+    "microphone and logger corrections",
+    "important-usage storage capacity"
+  ],
+  "libretro_cores": [
+    "armsx2",
+    "dolphin",
+    "fceumm",
+    "mednafen.saturn",
+    "opera",
+    "play",
+    "snes9x2010",
+    "yabause"
+  ],
+  "testflight_compatible": false,
+  "signed_native_core_sha256": "346e2b51641a72ba796b6e3b5c40fcedde5ec3adff96f173f4cd4b38cb761cfd",
+  "signature_verified": true,
+  "host_source_commit": "b2fdae168708e71a59a3a5815f33b07ed84f47e9",
+  "native_text_sha256": "43376abc6c5f8fedf9c22b941e8670dada3dcf9f5046c037eaedce57b367b7ae",
+  "published_host_source_commit": "371134a869936d42e888b0a0c1f33125600b774d",
+  "host_source_tree": "3429883de2b8b8685b949e4f8da3e3216a71a7d4"
+}

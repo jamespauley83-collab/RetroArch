@@ -14,10 +14,11 @@
     self.continueAfterFailure = NO;
     XCUIApplication *app = [[XCUIApplication alloc] initWithBundleIdentifier:@"com.jamespauley.retroarchlab.ps3bridge"];
     XCUIApplication *stik = [[XCUIApplication alloc] initWithBundleIdentifier:@"com.stik.stikdebug"];
+    [app terminate];
     [app launch];
     XCTAssertTrue([app.buttons[@"PS3"] waitForExistenceWithTimeout:20], @"%@", app.debugDescription);
     [app.buttons[@"PS3"] tap];
-    XCTAssertTrue([app.buttons[@"Enable PS3 JIT"] waitForExistenceWithTimeout:10]);
+    XCTAssertTrue([app.buttons[@"Enable PS3 JIT"] waitForExistenceWithTimeout:10], @"%@", app.debugDescription);
     [app.buttons[@"Enable PS3 JIT"] tap];
     XCTAssertTrue([stik.buttons[@"Enable and Run Script"] waitForExistenceWithTimeout:20], @"%@", stik.debugDescription);
     XCTAssertTrue(stik.staticTexts[@"An external link wants to enable JIT and run a script for com.jamespauley.retroarchlab.ps3bridge."].exists);

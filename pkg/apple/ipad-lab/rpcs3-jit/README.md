@@ -7,7 +7,10 @@ microphone, logger and import-storage corrections.
 
 ## Build inputs
 
-- Host source: build-14 commit 088115472b5a2f88993709710e71f2b442580d5d.
+- Published host source for build 16: 371134a869936d42e888b0a0c1f33125600b774d.
+  The installed host was compiled from local commit b2fdae168708e71a59a3a5815f33b07ed84f47e9;
+  both commits have the identical source tree 3429883de2b8b8685b949e4f8da3e3216a71a7d4.
+  This retains the build-15 native core and corrects the StikDebug relaunch handoff.
 - Native core: XITRIX/rpcs3 f88bff947b83730c0cf8a3949f59338b992b3ca0.
 - LLVM: XITRIX/LLVM-On-iOS release llvm-ios15-ca7933e47d3a3451-ec81b2304bcb.
 - LLVM source revision: ca7933e47d3a3451d81e72ac174dcb5aa28b59d1.
@@ -69,7 +72,7 @@ python3 package_development.py \
   --host-app /path/to/HostDerivedData/Build/Products/Release-iphoneos/RetroArch.app \
   --native-core /path/to/native-build/rpcs3/libRPCS3Core.dylib \
   --output /path/to/new-development-package \
-  --build 15 \
+  --build 16 \
   --signing-identity DEVELOPMENT_SIGNING_IDENTITY
 ~~~
 
@@ -91,7 +94,8 @@ A build or a JIT button alone is insufficient. On a physical device:
 
 1. Open **PS3 → Enable PS3 JIT**.
 2. In StikDebug, approve **Enable and Run Script** for the established Lab
-   identifier and its assigned universal.js.
+   identifier and its assigned universal.js. StikDebug relaunches the app;
+   omit the old PID for this verified iPad launch path.
 3. Return to **PS3 → Start PS3**.
 4. The existing host must complete the Universal handshake, initialize the
    native core and execute the LLVM self-test, which returns 22 for input 5.
@@ -104,5 +108,9 @@ This is a development installation. The interpreter TestFlight variant does
 not contain this JIT execution path. Reinstalling that variant replaces this
 development build.
 
-See VALIDATION.md for actual build and device results. All work uses local
-builds; publication commits include [skip ci].
+Enable PS3 JIT finishes and saves an active performance recording before
+relaunching. Start a new recording after the handoff to capture Start PS3.
+
+See [build 16 verification](VALIDATION-2026-11-08.md) for the handoff correction,
+and [build 15 verification](VALIDATION.md) for the original restoration.
+All work uses local builds; publication commits include [skip ci].
