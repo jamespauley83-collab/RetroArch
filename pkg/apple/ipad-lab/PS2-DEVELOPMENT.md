@@ -1,5 +1,62 @@
 # PS2 development
 
+## Current milestone — November 10, 2026
+
+Make PS2 games reliably usable through the existing ARMSX2 **libretro core** in
+RetroArch Lab. Standalone RPCS3/PS3 work is owned by
+[RPCS3-iOS-Lab](https://github.com/jamespauley83-collab/RPCS3-iOS-Lab).
+RPCS3 is not the PS2 engine.
+
+The retained source baseline is `codex/restore-jit-20261108` at
+`9aff43803156418ba13cc68c9ea6832ccf8a0432` (PR #23). This is the source-history
+baseline, not a claim that its documentation commit built the installed app.
+ARMSX2 integration already exists: the core source is pinned to
+`e58489d349cdcd635fc6264546087e347c84bf8c` and the optional eight-core packaging
+path is implemented. Do not restart this work as a new standalone PS2 app.
+
+### Core boundary
+
+| Responsibility | Owner |
+| --- | --- |
+| Library, content selection, JIT activation, executable-memory callbacks and frontend scheduling | RetroArch Lab host |
+| PS2 CPU/GS execution, BIOS/resources and virtual memory cards | ARMSX2 core plus the existing integration patches |
+| Frame delivery, stereo audio batches, controller polling and lifecycle | Existing libretro callbacks and ARMSX2 adapter |
+| Standalone PS3 library/runtime/releases | RPCS3-iOS-Lab; no dependency for this milestone |
+
+Keep the current adapter and executable-memory ABI. The ARMSX2 device variant
+uses Metal with CPU frame readback; this is a measurable baseline, not proof of
+adequate frame pacing. Keep JIT development and interpreter distribution results
+separate. The previous TestFlight interpreter BIOS check does not demonstrate
+commercial-game playability or acceptance of the JIT build.
+
+### Acceptance sequence
+
+1. Inventory the installed Lab identity/build and retain the matching source,
+   core hashes, settings and a copy of existing memory cards before replacement.
+2. Run the focused ARMSX2 native and package checks documented in
+   [the experiment](experiments/armsx2/README.md). Reuse verified dependencies and
+   build locally; avoid hosted builds while Actions usage is constrained.
+3. Verify that the intended PS2 core is packaged and selected, the BIOS/resources
+   resolve inside this app, and JIT is available for this exact process before
+   boot. Record the selected allocator mode and any launch failure.
+4. Run one owner-provided game on the M3 iPad at 1x resolution. Record game title,
+   disc ID/region, image hash, iPadOS, app/core revision, JIT state and settings.
+   Verify visible gameplay, sustained audio and touch/controller input.
+5. Make an in-game save, close normally, restart the app and reload it. Exercise
+   pause/resume, background/foreground, reset/stop, then switch to a non-PS2 core
+   and back. Keep Play! and ARMSX2 memory cards separate.
+6. Record a repeatable warmed-up gameplay section with the performance recorder:
+   FPS/frame timing, audio interruptions, thermal state and any slowdown marker.
+   Compare recording on/off before attributing performance changes to the core.
+
+The first deliverable is one reproducible PS2 game session with save/reload and
+lifecycle evidence in the combined Lab app. Fix observed failures before
+expanding the game list or changing the default core. Existing October reports
+below are useful leads, not acceptance of a newly built candidate. No new
+PS2 gameplay, installation or performance result is claimed by this separation.
+
+## Historical assessment
+
 ## Baseline and next candidates
 
 Assessment: October 15, 2026. The current six-core Lab baseline is
@@ -80,3 +137,4 @@ that directory before device experiments.
 - [ARMSX2 iOS announcement](https://armsx2.net/updates/iOS-2.0-v1)
 - [ARMSX2 inspected source](https://github.com/ARMSX2/ARMSX2/tree/e58489d349cdcd635fc6264546087e347c84bf8c)
 - [Libretro PS2 ARM64 development](https://github.com/libretro/ps2)
+
