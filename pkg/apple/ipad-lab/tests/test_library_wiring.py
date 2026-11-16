@@ -1,5 +1,6 @@
 """Lab-only integration guards; behavioral helpers also run natively on macOS."""
 from pathlib import Path
+import re
 import unittest
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -10,12 +11,31 @@ def read(path):
 
 
 class LibraryWiringTests(unittest.TestCase):
+    def test_cold_launch_and_view_appearance_preserve_retroarch_menu(self):
+        def method(source, marker):
+            self.assertIn(marker, source)
+            body = source.split(marker, 1)[1]
+            return re.split(r'(?m)^[+-]\s*\(', body, maxsplit=1)[0]
+
+        startup = method(read('ui/drivers/ui_cocoatouch.m'),
+                         '- (void)applicationDidFinishLaunching:')
+        self.assertIn('rarch_main(argc, argv, NULL);', startup)
+        self.assertNotIn('cocoa_lab_show_library', startup)
+        common = read('ui/drivers/cocoa/cocoa_common.m')
+        appearance = method(common, '- (void)viewDidAppear:(BOOL)animated')
+        self.assertNotIn('cocoa_lab_show_library', appearance)
+        manual = method(common, '-(void) showNativeMenu')
+        self.assertIn('cocoa_lab_show_library();', manual)
+
     def test_only_lab_configuration_enables_library(self):
         self.assertIn('-DHAVE_RETROARCH_LAB_LIBRARY', read('pkg/apple/ipad-lab/Lab.xcconfig'))
         self.assertNotIn('HAVE_RETROARCH_LAB_LIBRARY', read('pkg/apple/BaseConfig.xcconfig'))
 
     def test_objc_build_includes_screen_only_for_lab_ios(self):
         self.assertIn('#if defined(HAVE_RETROARCH_LAB_LIBRARY) && TARGET_OS_IOS\n'
+                      '#if defined(HAVE_RETROARCH_LAB_TESTFLIGHT) && defined(HAVE_RETROARCH_LAB_STIKJIT)\n'
+                      '#error TestFlight builds must exclude development-only debugger activation\n'
+                      '#endif\n'
                       '#ifdef HAVE_RETROARCH_LAB_STIKJIT\n'
                       '#include "../ui/drivers/cocoa/RetroArchLabJIT.m"\n'
                       '#endif\n#include "../ui/drivers/cocoa/RetroArchLabLibrary.m"',

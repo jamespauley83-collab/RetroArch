@@ -250,15 +250,15 @@ static void RALabPS3Progress(void *context, uint32_t done, uint32_t total, const
 #ifndef RA_LAB_PS3_INTERPRETER_ONLY
 - (void)enableJIT
 {
-   RALabPerfEvent(@"PS3: requesting StikDebug attachment to current process");
+   RALabPerfEvent(@"PS3: requesting StikDebug relaunch with Universal");
+   RALabPerfPrepareForRelaunch();
    NSURLComponents *url = [[NSURLComponents alloc] init];
    url.scheme = @"stikdebug"; url.host = @"enable-jit";
-   /* Attach to this process so its startup recording survives the handoff. */
+   /* StikDebug must launch this app before attaching on this device. */
    url.queryItems = @[[NSURLQueryItem queryItemWithName:@"bundle-id" value:NSBundle.mainBundle.bundleIdentifier],
-         [NSURLQueryItem queryItemWithName:@"pid" value:[NSString stringWithFormat:@"%d", getpid()]],
          [NSURLQueryItem queryItemWithName:@"script-name" value:@"universal.js"]];
    [UIApplication.sharedApplication openURL:url.URL options:@{} completionHandler:^(BOOL opened) {
-      self.status.text = opened ? @"Let StikDebug attach Universal, return to this app, and tap Start PS3."
+      self.status.text = opened ? @"Let StikDebug relaunch this app with Universal, then open PS3 and tap Start PS3. Any active performance recording has been saved."
             : @"Open StikDebug, assign universal.js to this PS3 test app, and launch it there.";
    }];
 }

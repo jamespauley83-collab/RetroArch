@@ -1119,10 +1119,6 @@ bool cocoa_audio_session_begin_record(unsigned preferred_rate,
 
    rarch_main(argc, argv, NULL);
 
-#if defined(HAVE_RETROARCH_LAB_LIBRARY) && TARGET_OS_IOS
-   if (retroarch_ctl(RARCH_CTL_IS_DUMMY_CORE, NULL))
-      cocoa_lab_show_library();
-#endif
 
 #ifdef HAVE_KSCRASH
    [self processKSCrashReports];

@@ -3,7 +3,9 @@
 Open **Performance** in the native game library or PS3 screen. Start recording,
 return to the game, and play the same section for 2–3 minutes. Tap the top-left overlay
 when a slowdown is noticeable. Return to Performance, stop, and share the report.
-For startup failures, start recording before Enable PS3 JIT / Start PS3.
+Enable PS3 JIT saves and stops an active recording before StikDebug relaunches
+the app. To record PS3 startup, start a new recording after returning from
+StikDebug and before tapping Start PS3.
 
 Recording is opt-in and never starts automatically. Reports are newline-delimited
 JSON in `Documents/Performance`. Each row has elapsed seconds; the first row also

@@ -543,6 +543,8 @@ static NSString *RALabPerfValue(id value, NSString *format)
 
 void RALabPerfEvent(NSString *event)
 { if (ra_lab_perf_clock()) [[RALabPerformance shared] event:event]; }
+void RALabPerfPrepareForRelaunch(void)
+{ if (ra_lab_perf_clock()) [[RALabPerformance shared] stop:@"jit_relaunch"]; }
 void RALabPerfPS3Surface(UIView *surface)
 { RALabPerformance.shared.ps3Surface = surface; [RALabPerformance.shared updateOverlay]; }
 
