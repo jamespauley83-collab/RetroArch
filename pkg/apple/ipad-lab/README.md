@@ -1,5 +1,23 @@
 # RetroArch Lab for iPad
 
+## Current project direction — November 10, 2026
+
+RetroArch Lab owns multi-system/libretro work. Its next milestone is reliable
+PS2 gameplay through the existing ARMSX2 core; see the current section of
+[PS2 development](PS2-DEVELOPMENT.md).
+
+Standalone iPad RPCS3 development belongs to
+[RPCS3-iOS-Lab](https://github.com/jamespauley83-collab/RPCS3-iOS-Lab), with its own
+frontend, runtime lock, build steps and release history. The native PS3 bridge
+in this tree is retained for compatibility with existing Lab installations.
+It is not the standalone app's release source. No app identities or data are
+migrated by this project separation.
+
+The build/setup sections below include historical candidates and identifiers.
+For any new device work, use the exact installed bundle ID and recorded build;
+do not choose an installer from its display name alone. See
+[project boundaries and retained baselines](PROJECT-BOUNDARIES.md).
+
 A separate native iOS build for testing emulator-core changes. The first baseline
 includes FCEUmm (NES/Famicom), Snes9x 2010 (SNES), Opera (3DO), Dolphin (GameCube/Wii),
 Play! (PlayStation 2), Beetle Saturn and Yabause (Sega Saturn),
@@ -336,4 +354,5 @@ Linux x86-64 additionally executes generated and patched code in the harness.
 
 References: [Play! source and iOS instructions](https://github.com/jpd002/Play-),
 [Libretro Play! documentation](https://docs.libretro.com/library/play/).
+
 
