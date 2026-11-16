@@ -1,5 +1,6 @@
 """Lab-only integration guards; behavioral helpers also run natively on macOS."""
 from pathlib import Path
+import re
 import unittest
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -11,15 +12,19 @@ def read(path):
 
 class LibraryWiringTests(unittest.TestCase):
     def test_cold_launch_and_view_appearance_preserve_retroarch_menu(self):
-        startup = read('ui/drivers/ui_cocoatouch.m')
-        startup = startup.split('- (void)applicationDidFinishLaunching:')[1]
-        startup = startup.split('rarch_main(argc, argv, NULL);')[1].split('#ifdef HAVE_KSCRASH')[0]
+        def method(source, marker):
+            self.assertIn(marker, source)
+            body = source.split(marker, 1)[1]
+            return re.split(r'(?m)^[+-]\s*\(', body, maxsplit=1)[0]
+
+        startup = method(read('ui/drivers/ui_cocoatouch.m'),
+                         '- (void)applicationDidFinishLaunching:')
+        self.assertIn('rarch_main(argc, argv, NULL);', startup)
         self.assertNotIn('cocoa_lab_show_library', startup)
         common = read('ui/drivers/cocoa/cocoa_common.m')
-        appearance = common.split('- (void)viewDidAppear:(BOOL)animated')[1]
-        appearance = appearance.split('-(void)viewWillAppear:')[0]
+        appearance = method(common, '- (void)viewDidAppear:(BOOL)animated')
         self.assertNotIn('cocoa_lab_show_library', appearance)
-        manual = common.split('-(void) showNativeMenu')[1].split('-(void)toggleCustomKeyboard')[0]
+        manual = method(common, '-(void) showNativeMenu')
         self.assertIn('cocoa_lab_show_library();', manual)
 
     def test_only_lab_configuration_enables_library(self):
