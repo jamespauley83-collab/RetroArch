@@ -29,6 +29,20 @@ adequate frame pacing. Keep JIT development and interpreter distribution results
 separate. The previous TestFlight interpreter BIOS check does not demonstrate
 commercial-game playability or acceptance of the JIT build.
 
+Use a separate performance baseline for each build type:
+
+- **Development/JIT:** verify executable-memory availability for the running
+  process and record the allocator/JIT state with each gameplay measurement.
+- **TestFlight/interpreter:** [PR #20](https://github.com/jamespauley83-collab/RetroArch/pull/20)
+  disables the EE/IOP/VU0/VU1 recompilers, fastmem and MTVU, with no executable
+  arena. Its [device validation](testflight-interpreters/DEVICE-VALIDATION.md#ps2-interpreter)
+  covers BIOS rendering/audio callbacks and zero executable-memory requests;
+  commercial-game compatibility and performance remain unverified.
+
+Compare FPS and frame timing only within the same build type, core/settings,
+device and warmed-up game scene. Record interpreter results separately from
+JIT development acceptance.
+
 ### Acceptance sequence
 
 1. Inventory the installed Lab identity/build and retain the matching source,
