@@ -474,12 +474,39 @@ bool cocoa_lab_library_visible(void) { return ra_lab_library_visible; }
       assigned = [NSString stringWithUTF8String:expanded];
    }
 #ifdef HAVE_RETROARCH_LAB_TESTFLIGHT
-   if ([RALabCoreIdentifier(assigned) isEqualToString:@"play"])
-   { [self showProblem:@"This PS2 playlist uses Play!. Select ARMSX2 for this game in Advanced to use the TestFlight interpreter. ARMSX2 requires your PS2 BIOS."]; return; }
+   BOOL allowPlay = NO;
+#else
+   BOOL allowPlay = YES;
 #endif
+   NSArray *ps2Choices = RALabPS2CoreChoices(assigned, installed, allowPlay);
+   if (ps2Choices)
+   {
+      if (!ps2Choices.count)
+      { [self showProblem:@"This entry uses Play!, but no permitted PS2 core is available. Install a package containing ARMSX2; the library will not substitute another core."]; return; }
+      BOOL hasARMSX2 = [RALabCoreIdentifier(ps2Choices.firstObject) isEqualToString:@"armsx2"];
+      NSString *message = hasARMSX2
+            ? @"This entry is assigned to Play!. Choose ARMSX2 for this launch, or update the entry's Core Association in Advanced to keep that choice. ARMSX2 requires your PS2 BIOS. Memory cards and save states are not transferred between cores."
+            : @"This entry is assigned to Play!, and ARMSX2 is unavailable in this package. Continue with Play! only if you intend to use it.";
+      UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"Choose PS2 core"
+            message:message preferredStyle:UIAlertControllerStyleAlert];
+      [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+      for (NSString *choice in ps2Choices)
+      {
+         NSString *title = [RALabCoreIdentifier(choice) isEqualToString:@"armsx2"]
+               ? @"Use ARMSX2" : @"Use Play!";
+         [alert addAction:[UIAlertAction actionWithTitle:title style:UIAlertActionStyleDefault
+               handler:^(UIAlertAction *action) { [self confirmLaunchPath:path core:choice]; }]];
+      }
+      [self presentViewController:alert animated:YES completion:nil];
+      return;
+   }
    NSString *core = RALabResolveCore(assigned, installed);
    if (!core)
    { [self showProblem:@"Assign an installed core to this game or playlist in Advanced. The library will not guess a console from .iso or .chd."]; return; }
+   [self confirmLaunchPath:path core:core];
+}
+- (void)confirmLaunchPath:(NSString *)path core:(NSString *)core
+{
 #if !defined(HAVE_RETROARCH_LAB_STIKJIT) && !defined(HAVE_RETROARCH_LAB_TESTFLIGHT)
    NSString *identifier = RALabCoreIdentifier(core);
    /* ARMSX2 checks and allocates its required arena in retro_load_game. */

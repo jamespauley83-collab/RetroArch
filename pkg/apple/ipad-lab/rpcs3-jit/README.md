@@ -71,6 +71,7 @@ python3 package_development.py \
   --development-app /path/to/preserved-build-8/RetroArch.app \
   --host-app /path/to/HostDerivedData/Build/Products/Release-iphoneos/RetroArch.app \
   --native-core /path/to/native-build/rpcs3/libRPCS3Core.dylib \
+  --armsx2-system-files /path/to/eight-core-artifacts/ARMSX2-system-files.zip \
   --output /path/to/new-development-package \
   --build 16 \
   --signing-identity DEVELOPMENT_SIGNING_IDENTITY
@@ -82,6 +83,15 @@ development profile's debugger and memory entitlements. It restores the
 preserved JIT-capable libretro cores, including ARMSX2 and Play!, retains the
 storage privacy declarations, signs nested code and verifies the complete
 signature. It writes to a new directory and does not install or upload the app.
+
+Every libretro executable and its core-info entry must exist. The packager
+retains the existing `ARMSX2-system-files.zip` beside the app and records its
+checksum. This archive contains the pinned fonts and licenses only; BIOS,
+memory cards, save states and games are excluded. It still requires extraction
+into the configured System/BIOS directory after separate deployment approval.
+Packaging does not refresh existing Documents metadata or install resources.
+Check the actual core-info contents and active BIOS/resource paths on-device;
+file presence alone does not establish successful boot.
 
 Before updating a device in place, inventory its Documents and retain save and
 configuration recovery copies. Verify those files again after installation.

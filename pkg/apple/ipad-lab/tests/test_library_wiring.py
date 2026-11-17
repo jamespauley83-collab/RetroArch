@@ -54,6 +54,19 @@ class LibraryWiringTests(unittest.TestCase):
         self.assertIn('if (cocoa_lab_library_visible())\n   {\n'
                       '      task_queue_check();\n      return;', source)
 
+    def test_legacy_play_entry_requires_explicit_choice_before_launch(self):
+        source = read('ui/drivers/cocoa/RetroArchLabLibrary.m')
+        selection = source.split('didSelectItemAtIndexPath:')[1].split('- (void)confirmLaunchPath:')[0]
+        self.assertIn('RALabPS2CoreChoices(assigned, installed, allowPlay)', selection)
+        choices = selection.split('if (ps2Choices)')[1].split('NSString *core =')[0]
+        self.assertIn('@"Use ARMSX2"', choices)
+        self.assertIn('@"Use Play!"', choices)
+        self.assertIn('handler:^(UIAlertAction *action) { [self confirmLaunchPath:path core:choice]; }', choices)
+        self.assertIn('return;', choices)
+        self.assertNotIn('[self launchPath:', choices)
+        self.assertNotIn('[self queuePath:', choices)
+        self.assertIn('#ifdef HAVE_RETROARCH_LAB_TESTFLIGHT\n   BOOL allowPlay = NO;', selection)
+
     def test_workflow_covers_native_changes_and_checks(self):
         workflow = read('.github/workflows/ipad-lab.yml')
         for path in ('ui/drivers/cocoa/**', 'ui/drivers/ui_cocoatouch.m', 'griffin/griffin_objc.m'):
