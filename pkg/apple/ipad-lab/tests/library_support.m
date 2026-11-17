@@ -49,6 +49,20 @@ int main(void)
             isEqualToString:cores[1]]);
       CHECK(RALabResolveCore(@"/old/armsx2_libretro_ios.dylib", cores) == nil);
       CHECK(RALabResolveCore(@"game.iso", withPS2) == nil);
+      CHECK(([RALabPS2CoreChoices(@"/old/play_libretro_ios.dylib", withPS2, YES)
+            isEqualToArray:@[withPS2.lastObject, cores[1]]]));
+      CHECK([RALabPS2CoreChoices(@"/old/play_libretro_ios.dylib", withPS2, NO)
+            isEqualToArray:@[withPS2.lastObject]]);
+      CHECK([RALabPS2CoreChoices(cores[1], cores, YES) isEqualToArray:@[cores[1]]]);
+      CHECK(RALabPS2CoreChoices(cores[1], cores, NO).count == 0);
+      CHECK(RALabPS2CoreChoices(cores[1], @[], YES).count == 0);
+      CHECK(RALabPS2CoreChoices(withPS2.lastObject, withPS2, YES) == nil);
+      CHECK(RALabPS2CoreChoices(cores[0], withPS2, YES) == nil);
+      CHECK(RALabPS2CoreChoices(@"DETECT", withPS2, YES) == nil);
+      CHECK(RALabPS2CoreChoices(@"game.iso", withPS2, YES) == nil);
+      CHECK(RALabPS2CoreChoices(@"game.chd", withPS2, YES) == nil);
+      CHECK(RALabPS2CoreChoices(@"play", @[@"/one/armsx2.libretro",
+            @"/two/armsx2.libretro"], NO).count == 0);
       NSArray *withSaturn = [withPS2 arrayByAddingObject:
             @"/app/yabause.libretro.framework/yabause.libretro"];
       CHECK([RALabResolveCore(@"/old/yabause_libretro_ios.dylib", withSaturn)

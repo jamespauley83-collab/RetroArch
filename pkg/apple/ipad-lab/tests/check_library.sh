@@ -24,3 +24,11 @@ xcrun --sdk iphoneos clang -fsyntax-only -fobjc-arc \
   -include ui/drivers/cocoa/cocoa_common.h \
   -Werror=implicit-function-declaration -Werror=objc-method-access \
   ui/drivers/cocoa/RetroArchLabLibrary.m ui/drivers/cocoa/RetroArchLabJIT.m
+
+xcrun --sdk iphoneos clang -fsyntax-only -fobjc-arc \
+  -target arm64-apple-ios26.0 -isysroot "$sdk" \
+  -DHAVE_COCOATOUCH -DHAVE_MENU -DHAVE_RETROARCH_LAB_LIBRARY -DHAVE_RETROARCH_LAB_TESTFLIGHT \
+  -I. -Ilibretro-common/include -Ipkg/apple \
+  -include ui/drivers/cocoa/cocoa_common.h \
+  -Werror=implicit-function-declaration -Werror=objc-method-access \
+  ui/drivers/cocoa/RetroArchLabLibrary.m

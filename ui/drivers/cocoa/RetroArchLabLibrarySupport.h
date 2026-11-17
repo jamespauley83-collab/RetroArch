@@ -36,6 +36,20 @@ static inline NSString *RALabResolveCore(NSString *assigned, NSArray<NSString *>
    return match;
 }
 
+/* A legacy Play! assignment requires an explicit PS2 choice. */
+static inline NSArray<NSString *> *RALabPS2CoreChoices(NSString *assigned,
+      NSArray<NSString *> *installed, BOOL allowPlay)
+{
+   if (![RALabCoreIdentifier(assigned) isEqualToString:@"play"])
+      return nil;
+   NSMutableArray *choices = [NSMutableArray array];
+   NSString *armsx2 = RALabResolveCore(@"armsx2", installed);
+   NSString *play = allowPlay ? RALabResolveCore(assigned, installed) : nil;
+   if (armsx2) [choices addObject:armsx2];
+   if (play) [choices addObject:play];
+   return choices;
+}
+
 static inline NSArray<NSString *> *RALabEntryKey(NSString *path, NSString *core)
 {
    return @[[path stringByStandardizingPath] ?: @"", RALabCoreIdentifier(core) ?: @""];

@@ -8,11 +8,18 @@ from pathlib import Path
 import plistlib
 import shutil
 import subprocess
+import zipfile
 from datetime import datetime
 
 IDENTITY = "com.jamespauley.retroarchlab.ps3bridge"
 CORES = ("armsx2", "dolphin", "fceumm", "mednafen.saturn", "opera", "play", "snes9x2010", "yabause")
 LLVM = "ca7933e47d3a3451d81e72ac174dcb5aa28b59d1"
+ARMSX2_FONT_FILES = {
+    "Roboto-Regular-copyright", "Roboto-Regular.ttf", "RobotoMono-Medium.ttf",
+    "Twemoji.Mozilla-license", "Twemoji.Mozilla.ttf", "fa-solid-900.ttf",
+    "promptfont-license", "promptfont.otf",
+}
+ARMSX2_SYSTEM_FILES = "ARMSX2-system-files.zip"
 
 
 def run(*args):
@@ -27,9 +34,51 @@ def info(app):
     return plistlib.loads((app / "Info.plist").read_bytes())
 
 
+def validate_libretro_inputs(resource_app, development_app):
+    records = {}
+    with zipfile.ZipFile(resource_app / "assets.zip") as assets:
+        names = assets.namelist()
+        for name in CORES:
+            framework = development_app / "Frameworks" / (name + ".libretro.framework")
+            binary = framework / (name + ".libretro")
+            if not binary.is_file() or not binary.stat().st_size:
+                raise ValueError("Missing development core executable: " + name)
+            metadata = "info/" + name.replace(".", "_") + "_libretro.info"
+            if names.count(metadata) != 1 or not assets.read(metadata).strip():
+                raise ValueError("Missing or ambiguous core metadata: " + name)
+            records[name] = {"input_sha256": digest(binary),
+                             "info_sha256": hashlib.sha256(assets.read(metadata)).hexdigest()}
+    return records
+
+
+def validate_armsx2_system_files(path):
+    prefix = "pcsx2/resources/fonts/"
+    allowed = {prefix + name for name in ARMSX2_FONT_FILES}
+    directories = {"pcsx2/", "pcsx2/resources/", prefix}
+    with zipfile.ZipFile(path) as archive:
+        names = archive.namelist()
+        if len(names) != len(set(names)):
+            raise ValueError("Duplicate ARMSX2 system resource entries.")
+        for entry in archive.infolist():
+            mode = (entry.external_attr >> 16) & 0o170000
+            if (entry.filename not in allowed | directories or mode == 0o120000
+                    or (entry.filename in allowed and entry.is_dir())):
+                raise ValueError("ARMSX2 system archive must contain only the pinned fonts and licenses.")
+        required = prefix + "Roboto-Regular.ttf"
+        if required not in names or not archive.read(required):
+            raise ValueError("ARMSX2 system archive is missing Roboto-Regular.ttf.")
+        if archive.testzip() is not None:
+            raise ValueError("ARMSX2 system archive CRC failure.")
+    return {"file": ARMSX2_SYSTEM_FILES, "sha256": digest(path),
+            "extraction_required": True,
+            "destination": "Configured System/BIOS directory",
+            "contains_bios_or_saves": False}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    for key in ("resource-app", "development-app", "host-app", "native-core", "output"):
+    for key in ("resource-app", "development-app", "host-app", "native-core", "output",
+                "armsx2-system-files"):
         parser.add_argument("--" + key, type=Path, required=True)
     parser.add_argument("--build", type=int, required=True)
     parser.add_argument("--signing-identity", required=True)
@@ -39,6 +88,8 @@ def main():
     for app in (args.resource_app, args.development_app, args.host_app):
         if info(app)["CFBundleIdentifier"] != IDENTITY:
             raise ValueError("Every input must use the established Lab identity.")
+    libretro_records = validate_libretro_inputs(args.resource_app, args.development_app)
+    system_files = validate_armsx2_system_files(args.armsx2_system_files)
     host = args.host_app / info(args.host_app)["CFBundleExecutable"]
     host_bytes = host.read_bytes()
     core_bytes = args.native_core.read_bytes()
@@ -64,9 +115,6 @@ def main():
             raise ValueError("The development profile and signature must authorize " + key)
     if not entitlements["application-identifier"].endswith("." + IDENTITY):
         raise ValueError("The development signature has a different app identity.")
-    for name in CORES:
-        if not (args.development_app / "Frameworks" / (name + ".libretro.framework")).is_dir():
-            raise ValueError("Missing development core: " + name)
     target = args.output / "Payload/RetroArch.app"
     shutil.copytree(args.resource_app, target)
     if (target / "PlugIns").exists():
@@ -108,7 +156,12 @@ def main():
         "llvm_revision": LLVM, "native_patches": ["interpreter build option disabled",
         "microphone and logger corrections", "important-usage storage capacity"],
         "libretro_cores": list(CORES), "testflight_compatible": False,
+        "libretro_inputs": libretro_records, "armsx2_system_files": system_files,
     }
+    support = args.output / ARMSX2_SYSTEM_FILES
+    shutil.copy2(args.armsx2_system_files, support)
+    if digest(support) != system_files["sha256"]:
+        raise ValueError("ARMSX2 system resource copy differs from the validated input.")
     (target / "RPCS3-core.lock.json").write_text(json.dumps(record, indent=2) + "\n")
     for item in sorted(frameworks.iterdir()):
         if item.suffix in (".framework", ".dylib"):
@@ -120,6 +173,7 @@ def main():
     record["signature_verified"] = True
     (args.output / "manifest.json").write_text(json.dumps(record, indent=2) + "\n")
     print(target)
+    print("ARMSX2 font resources retained separately; extraction into the configured System/BIOS directory remains required.")
 
 
 if __name__ == "__main__":
